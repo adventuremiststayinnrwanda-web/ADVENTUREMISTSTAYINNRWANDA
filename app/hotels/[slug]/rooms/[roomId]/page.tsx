@@ -1,0 +1,67 @@
+import Image from "next/image";
+import { notFound } from "next/navigation";
+import { CalendarDays, QrCode, Users } from "lucide-react";
+import { BookingCheckout } from "@/components/BookingCheckout";
+import { Footer } from "@/components/Footer";
+import { Header } from "@/components/Header";
+import { getHotel, getRoom } from "@/lib/data";
+
+export default async function RoomDetailsPage({
+  params
+}: {
+  params: Promise<{ slug: string; roomId: string }>;
+}) {
+  const { slug, roomId } = await params;
+  const hotel = getHotel(slug);
+  const room = getRoom(slug, roomId);
+
+  if (!hotel || !room) {
+    notFound();
+  }
+
+  return (
+    <>
+      <Header />
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="grid gap-8 lg:grid-cols-[1fr_420px]">
+          <section>
+            <div className="relative min-h-[460px] overflow-hidden rounded-lg">
+              <Image src={room.image} alt={room.name} fill priority className="object-cover" />
+            </div>
+            <div className="mt-8">
+              <p className="font-semibold text-emerald-800">{hotel.name}</p>
+              <h1 className="mt-2 text-4xl font-bold text-stone-950">{room.name}</h1>
+              <p className="mt-4 text-lg leading-8 text-stone-700">{room.description}</p>
+              <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-lg border border-stone-200 bg-white p-4">
+                  <Users className="text-emerald-700" />
+                  <p className="mt-3 font-semibold">Up to {room.capacity} guests</p>
+                </div>
+                <div className="rounded-lg border border-stone-200 bg-white p-4">
+                  <CalendarDays className="text-emerald-700" />
+                  <p className="mt-3 font-semibold">{room.bedType}</p>
+                </div>
+                <div className="rounded-lg border border-stone-200 bg-white p-4">
+                  <QrCode className="text-emerald-700" />
+                  <p className="mt-3 font-semibold">QR check-in included</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <aside className="h-fit rounded-lg border border-stone-200 bg-white p-6 shadow-sm">
+            <h2 className="text-2xl font-bold text-stone-950">Guest checkout</h2>
+            <p className="mt-2 text-sm text-stone-600">No customer registration required.</p>
+            <BookingCheckout
+              hotelSlug={hotel.slug}
+              roomId={room.id}
+              roomPrice={room.price}
+              roomCapacity={room.capacity}
+            />
+          </aside>
+        </div>
+      </main>
+      <Footer />
+    </>
+  );
+}
