@@ -28,6 +28,9 @@ PESAPAL_CONSUMER_SECRET=
 PESAPAL_IPN_ID=
 PESAPAL_CURRENCY=USD
 PESAPAL_PUBLIC_BASE_URL=https://your-vercel-domain.vercel.app
+ADMIN_EMAIL=adventuremiststayinnrwanda@gmail.com
+ADMIN_PASSWORD=
+ADMIN_SESSION_SECRET=
 ```
 
 After deployment, register the Pesapal IPN:

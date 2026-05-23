@@ -74,6 +74,9 @@ PESAPAL_CONSUMER_SECRET=
 PESAPAL_IPN_ID=
 PESAPAL_CURRENCY=USD
 PESAPAL_PUBLIC_BASE_URL=https://your-domain.com
+ADMIN_EMAIL=adventuremiststayinnrwanda@gmail.com
+ADMIN_PASSWORD=
+ADMIN_SESSION_SECRET=
 ```
 
 Register the public IPN URL in Pesapal first. The URL must be public HTTPS:

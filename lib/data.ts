@@ -1,7 +1,10 @@
 import {
   AirVent,
   Car,
+  Coffee,
   Dumbbell,
+  Mountain,
+  ShieldCheck,
   Soup,
   Tv,
   Utensils,
@@ -48,163 +51,99 @@ export const amenityIcons = {
   Restaurant: Utensils,
   "Air conditioning": AirVent,
   TV: Tv,
-  Breakfast: Soup
+  Breakfast: Soup,
+  Coffee: Coffee,
+  Security: ShieldCheck,
+  "Mountain views": Mountain
 };
 
 export const hotels: Hotel[] = [
   {
-    id: "h-001",
-    slug: "aurora-grand-hotel",
-    name: "Aurora Grand Hotel",
-    city: "Cape Town",
-    country: "South Africa",
+    id: "adventure-mist-stay-inn-rwanda",
+    slug: "adventure-mist-stay-inn-rwanda",
+    name: "Adventure Mist Stay Inn Rwanda",
+    city: "Kigali",
+    country: "Rwanda",
     rating: 4.8,
-    priceFrom: 1420,
+    priceFrom: 65,
     image:
-      "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1400&q=80",
+      "https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=1400&q=80",
     gallery: [
+      "https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=1400&q=80",
       "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1400&q=80",
-      "https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=1200&q=80",
-      "https://images.unsplash.com/photo-1582719508461-905c673771fd?auto=format&fit=crop&w=1200&q=80"
+      "https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=1200&q=80"
     ],
     description:
-      "A polished coastal hotel with spacious suites, mountain views, and a calm hospitality experience for business and leisure stays.",
-    address: "18 Ocean View Road, Cape Town",
-    phone: "+27 21 555 0180",
-    email: "reservations@auroragrand.example",
-    amenities: ["WiFi", "Pool", "Parking", "Gym", "Restaurant", "Air conditioning"],
-    rooms: [
-      {
-        id: "r-001",
-        name: "Deluxe Ocean Room",
-        price: 1420,
-        capacity: 2,
-        bedType: "King bed",
-        size: "38 sqm",
-        status: "Available",
-        image:
-          "https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=1200&q=80",
-        features: ["Balcony", "TV", "Hot shower", "Breakfast"],
-        description:
-          "A bright ocean-facing room with private balcony, work desk, breakfast, and fast WiFi."
-      },
-      {
-        id: "r-002",
-        name: "Executive Mountain Suite",
-        price: 2180,
-        capacity: 3,
-        bedType: "King bed + sofa",
-        size: "55 sqm",
-        status: "Available",
-        image:
-          "https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1200&q=80",
-        features: ["Lounge", "TV", "Breakfast", "Air conditioning"],
-        description:
-          "A larger suite with lounge seating, premium linens, and generous storage for longer stays."
-      }
-    ]
-  },
-  {
-    id: "h-002",
-    slug: "harbor-atelier",
-    name: "Harbor Atelier",
-    city: "Durban",
-    country: "South Africa",
-    rating: 4.6,
-    priceFrom: 980,
-    image:
-      "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?auto=format&fit=crop&w=1400&q=80",
-    gallery: [
-      "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?auto=format&fit=crop&w=1400&q=80",
-      "https://images.unsplash.com/photo-1595576508898-0ad5c879a061?auto=format&fit=crop&w=1200&q=80",
-      "https://images.unsplash.com/photo-1596394516093-501ba68a0ba6?auto=format&fit=crop&w=1200&q=80"
+      "Adventure Mist Stay Inn Rwanda is a calm Kigali stay for travelers who want comfort, reliable service, and easy access to Rwanda's city experiences and outdoor adventures.",
+    address: "Kigali, Rwanda",
+    phone: "+250 700 000 000",
+    email: "adventuremiststayinnrwanda@gmail.com",
+    amenities: [
+      "WiFi",
+      "Parking",
+      "Restaurant",
+      "Breakfast",
+      "Coffee",
+      "Security",
+      "Mountain views",
+      "Air conditioning"
     ],
-    description:
-      "A city harbor stay with comfortable rooms, easy beach access, and practical amenities for quick trips.",
-    address: "44 Marina Street, Durban",
-    phone: "+27 31 555 0144",
-    email: "hello@harboratelier.example",
-    amenities: ["WiFi", "Parking", "Restaurant", "Air conditioning"],
     rooms: [
       {
-        id: "r-003",
-        name: "Classic Queen Room",
-        price: 980,
+        id: "standard-queen-room",
+        name: "Standard Queen Room",
+        price: 65,
         capacity: 2,
         bedType: "Queen bed",
-        size: "30 sqm",
+        size: "28 sqm",
         status: "Available",
         image:
           "https://images.unsplash.com/photo-1595576508898-0ad5c879a061?auto=format&fit=crop&w=1200&q=80",
-        features: ["TV", "Hot shower", "Air conditioning"],
+        features: ["WiFi", "Breakfast", "Hot shower", "Work desk"],
         description:
-          "A compact, quiet room with soft lighting and everything needed for an easy overnight stay."
+          "A clean and comfortable queen room for solo travelers or couples, with breakfast and reliable WiFi included."
       },
       {
-        id: "r-004",
-        name: "Family Studio",
-        price: 1560,
-        capacity: 4,
-        bedType: "Two queen beds",
-        size: "48 sqm",
-        status: "Fully booked",
-        image:
-          "https://images.unsplash.com/photo-1596394516093-501ba68a0ba6?auto=format&fit=crop&w=1200&q=80",
-        features: ["TV", "Breakfast", "Mini fridge"],
-        description:
-          "A practical family room with two queen beds, breakfast, and extra space for luggage."
-      }
-    ]
-  },
-  {
-    id: "h-003",
-    slug: "garden-court-luxe",
-    name: "Garden Court Luxe",
-    city: "Johannesburg",
-    country: "South Africa",
-    rating: 4.7,
-    priceFrom: 1250,
-    image:
-      "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=1400&q=80",
-    gallery: [
-      "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=1400&q=80",
-      "https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=1200&q=80",
-      "https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=1200&q=80"
-    ],
-    description:
-      "A modern urban hotel with garden spaces, business-friendly rooms, and fast access to key city districts.",
-    address: "7 Rosebank Avenue, Johannesburg",
-    phone: "+27 11 555 0107",
-    email: "stay@gardencourtluxe.example",
-    amenities: ["WiFi", "Pool", "Parking", "Gym", "Restaurant"],
-    rooms: [
-      {
-        id: "r-005",
-        name: "Garden King Room",
-        price: 1250,
+        id: "deluxe-king-room",
+        name: "Deluxe King Room",
+        price: 90,
         capacity: 2,
         bedType: "King bed",
-        size: "35 sqm",
+        size: "36 sqm",
         status: "Available",
         image:
-          "https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=1200&q=80",
-        features: ["TV", "Breakfast", "Work desk"],
+          "https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=1200&q=80",
+        features: ["King bed", "Breakfast", "Air conditioning", "Mountain views"],
         description:
-          "A refined king room overlooking the hotel garden, with a proper desk and quiet sleep setup."
+          "A spacious king room with a calmer premium feel, designed for longer stays and restful evenings in Kigali."
       },
       {
-        id: "r-006",
-        name: "Business Twin Room",
-        price: 1320,
-        capacity: 2,
-        bedType: "Two twin beds",
-        size: "34 sqm",
-        status: "Maintenance",
+        id: "family-suite",
+        name: "Family Suite",
+        price: 125,
+        capacity: 4,
+        bedType: "King bed + twin beds",
+        size: "52 sqm",
+        status: "Available",
         image:
-          "https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=1200&q=80",
-        features: ["TV", "Hot shower", "Work desk"],
+          "https://images.unsplash.com/photo-1596394516093-501ba68a0ba6?auto=format&fit=crop&w=1200&q=80",
+        features: ["Family space", "Breakfast", "Mini fridge", "TV"],
         description:
-          "A twin room designed for colleagues or friends travelling together."
+          "A practical suite for families or small groups with extra sleeping space, TV, breakfast, and room to settle in."
+      },
+      {
+        id: "adventure-view-suite",
+        name: "Adventure View Suite",
+        price: 150,
+        capacity: 3,
+        bedType: "King bed + sofa",
+        size: "58 sqm",
+        status: "Available",
+        image:
+          "https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1200&q=80",
+        features: ["Lounge", "Mountain views", "Breakfast", "Premium linen"],
+        description:
+          "A larger suite with lounge seating and scenic views, ideal for guests who want extra comfort after a day out."
       }
     ]
   }
@@ -212,22 +151,22 @@ export const hotels: Hotel[] = [
 
 export const reviews = [
   {
-    name: "Maya Dlamini",
-    location: "Pretoria",
+    name: "Divine U.",
+    location: "Kigali",
     rating: 5,
-    comment: "The booking was quick and the QR check-in made arrival feel effortless."
+    comment: "The stay was quiet, friendly, and easy to arrange."
   },
   {
-    name: "Theo Jacobs",
-    location: "Cape Town",
+    name: "Jean Paul M.",
+    location: "Musanze",
     rating: 5,
-    comment: "Clear prices, smooth payment, and the hotel had everything listed."
+    comment: "Comfortable rooms and a smooth booking process."
   },
   {
-    name: "Amina Khan",
-    location: "Durban",
+    name: "Aline K.",
+    location: "Kigali",
     rating: 4,
-    comment: "I liked that I could book without creating an account first."
+    comment: "Good location, helpful service, and clear prices."
   }
 ];
 
