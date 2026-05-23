@@ -22,6 +22,31 @@ function publicBaseUrl(request: NextRequest) {
   ).replace(/\/$/, "");
 }
 
+async function resolveSupabaseIds(hotel: NonNullable<ReturnType<typeof getHotel>>, room: NonNullable<ReturnType<typeof getRoom>>) {
+  const hotelRows = await supabaseRest<Array<{ id: string }>>(
+    `hotels?name=eq.${encodeURIComponent(hotel.name)}&city=eq.${encodeURIComponent(hotel.city)}&select=id`
+  );
+  const hotelRow = hotelRows[0];
+
+  if (!hotelRow) {
+    throw new Error(`Hotel "${hotel.name}" is missing in Supabase.`);
+  }
+
+  const roomRows = await supabaseRest<Array<{ id: string }>>(
+    `rooms?hotel_id=eq.${encodeURIComponent(hotelRow.id)}&name=eq.${encodeURIComponent(room.name)}&select=id`
+  );
+  const roomRow = roomRows[0];
+
+  if (!roomRow) {
+    throw new Error(`Room "${room.name}" is missing in Supabase.`);
+  }
+
+  return {
+    hotelId: hotelRow.id,
+    roomId: roomRow.id
+  };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -42,6 +67,7 @@ export async function POST(request: NextRequest) {
     const taxes = Math.round(subtotal * 0.15);
     const total = subtotal + taxes;
     const reference = bookingReference();
+    const supabaseIds = await resolveSupabaseIds(hotel, room);
 
     const bookingRows = await supabaseRest<Array<{ id: string; booking_reference: string }>>(
       "bookings",
@@ -52,8 +78,8 @@ export async function POST(request: NextRequest) {
           guest_full_name: body.guest_full_name,
           guest_email: body.guest_email,
           guest_phone: body.guest_phone,
-          hotel_id: hotel.id,
-          room_id: room.id,
+          hotel_id: supabaseIds.hotelId,
+          room_id: supabaseIds.roomId,
           check_in_date: body.check_in_date,
           check_out_date: body.check_out_date,
           guest_count: guestCount,
