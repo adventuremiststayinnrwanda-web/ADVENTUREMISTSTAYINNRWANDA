@@ -108,6 +108,20 @@ export async function POST(request: NextRequest) {
       }
     });
 
+    const isValidPesapalOrder =
+      pesapalOrder &&
+      typeof pesapalOrder.order_tracking_id === "string" &&
+      pesapalOrder.order_tracking_id.trim().length > 0 &&
+      !(pesapalOrder as { error?: unknown }).error;
+
+    if (!isValidPesapalOrder) {
+      console.error("Pesapal submit order failed:", pesapalOrder);
+      return NextResponse.json(
+        { error: "Payment gateway error", details: pesapalOrder || null },
+        { status: 502 }
+      );
+    }
+
     await supabaseRest("payments", {
       method: "POST",
       body: JSON.stringify({
