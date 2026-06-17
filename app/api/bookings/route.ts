@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "node:crypto";
-import { getHotel, getRoom } from "@/lib/data";
+import { getDbHotel, getDbRoom } from "@/lib/server/db";
 import { submitPesapalOrder } from "@/lib/server/pesapal";
 import { supabaseRest } from "@/lib/server/supabaseRest";
 
@@ -22,36 +22,29 @@ function publicBaseUrl(request: NextRequest) {
   ).replace(/\/$/, "");
 }
 
-async function resolveSupabaseIds(hotel: NonNullable<ReturnType<typeof getHotel>>, room: NonNullable<ReturnType<typeof getRoom>>) {
-  const hotelRows = await supabaseRest<Array<{ id: string }>>(
-    `hotels?name=eq.${encodeURIComponent(hotel.name)}&city=eq.${encodeURIComponent(hotel.city)}&select=id`
-  );
-  const hotelRow = hotelRows[0];
-
-  if (!hotelRow) {
-    throw new Error(`Hotel "${hotel.name}" is missing in Supabase.`);
+function extractPesapalErrorMessage(pesapalOrder: any): string | null {
+  if (!pesapalOrder) return null;
+  if (typeof pesapalOrder.error === "string") return pesapalOrder.error;
+  if (pesapalOrder.error && typeof pesapalOrder.error.message === "string") {
+    return pesapalOrder.error.message;
   }
-
-  const roomRows = await supabaseRest<Array<{ id: string }>>(
-    `rooms?hotel_id=eq.${encodeURIComponent(hotelRow.id)}&name=eq.${encodeURIComponent(room.name)}&select=id`
-  );
-  const roomRow = roomRows[0];
-
-  if (!roomRow) {
-    throw new Error(`Room "${room.name}" is missing in Supabase.`);
+  if (pesapalOrder.error && typeof pesapalOrder.error.code === "string") {
+    return `Pesapal error: ${pesapalOrder.error.code}`;
   }
-
-  return {
-    hotelId: hotelRow.id,
-    roomId: roomRow.id
-  };
+  if (typeof pesapalOrder.message === "string") return pesapalOrder.message;
+  if (typeof pesapalOrder.status === "string" && pesapalOrder.status !== "200") {
+    return `Pesapal status ${pesapalOrder.status}`;
+  }
+  return null;
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const hotel = getHotel(body.hotel_slug);
-    const room = hotel ? getRoom(hotel.slug, body.room_id) : null;
+
+    // Load hotel and room dynamically from Supabase
+    const hotel = await getDbHotel(body.hotel_slug);
+    const room = hotel ? hotel.rooms.find((r) => r.id === body.room_id) || null : null;
     const nights = daysBetween(body.check_in_date, body.check_out_date);
     const guestCount = Number(body.guest_count);
 
@@ -67,8 +60,8 @@ export async function POST(request: NextRequest) {
     const taxes = Math.round(subtotal * 0.15);
     const total = subtotal + taxes;
     const reference = bookingReference();
-    const supabaseIds = await resolveSupabaseIds(hotel, room);
 
+    // hotel.id and room.id are Supabase UUIDs from the DB layer
     const bookingRows = await supabaseRest<Array<{ id: string; booking_reference: string }>>(
       "bookings",
       {
@@ -78,8 +71,8 @@ export async function POST(request: NextRequest) {
           guest_full_name: body.guest_full_name,
           guest_email: body.guest_email,
           guest_phone: body.guest_phone,
-          hotel_id: supabaseIds.hotelId,
-          room_id: supabaseIds.roomId,
+          hotel_id: hotel.id,
+          room_id: room.id,
           check_in_date: body.check_in_date,
           check_out_date: body.check_out_date,
           guest_count: guestCount,
@@ -116,9 +109,16 @@ export async function POST(request: NextRequest) {
 
     if (!isValidPesapalOrder) {
       console.error("Pesapal submit order failed:", pesapalOrder);
+
+      const pesapalErrorMessage = extractPesapalErrorMessage(pesapalOrder);
+      const exposeDetails = (process.env.PESAPAL_MODE || "sandbox") !== "live";
+
       return NextResponse.json(
-        { error: "Payment gateway error", details: pesapalOrder || null },
-        { status: 502 }
+        {
+          error: pesapalErrorMessage || "Payment gateway error",
+          details: exposeDetails ? pesapalOrder || null : undefined
+        },
+        { status: 400 }
       );
     }
 

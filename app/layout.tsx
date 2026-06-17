@@ -1,9 +1,18 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import "./globals.css";
+import { WhatsAppButton } from "@/components/WhatsAppButton";
+
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "StayEase Hotel Booking",
-  description: "Guest-first hotel room booking and management platform"
+  title: "Adventure Mist Stay Inn Rwanda",
+  description: "Premium hotel booking in Kigali",
+  icons: {
+    icon: "/logo.jpg",
+    shortcut: "/logo.jpg",
+    apple: "/logo.jpg"
+  }
 };
 
 export default function RootLayout({
@@ -13,7 +22,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body className={`${inter.className} bg-[var(--background)] text-[var(--foreground)] antialiased`}>
+        {children}
+        <WhatsAppButton />
+      </body>
     </html>
   );
 }

@@ -16,6 +16,8 @@ export type Room = {
   id: string;
   name: string;
   price: number;
+  originalPrice?: number;
+  offerTitle?: string;
   capacity: number;
   bedType: string;
   size: string;
@@ -92,7 +94,7 @@ export const hotels: Hotel[] = [
       {
         id: "standard-queen-room",
         name: "Standard Queen Room",
-        price: 65,
+        price: 10,
         capacity: 2,
         bedType: "Queen bed",
         size: "28 sqm",

@@ -46,29 +46,41 @@ export function BookingCheckout({
     setError("");
     setLoading(true);
 
-    const response = await fetch("/api/bookings", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        hotel_slug: hotelSlug,
-        room_id: roomId,
-        check_in_date: checkIn,
-        check_out_date: checkOut,
-        guest_count: guestCount,
-        guest_full_name: fullName,
-        guest_email: email,
-        guest_phone: phone
-      })
-    });
-    const data = await response.json();
+    try {
+      const response = await fetch("/api/bookings", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          hotel_slug: hotelSlug,
+          room_id: roomId,
+          check_in_date: checkIn,
+          check_out_date: checkOut,
+          guest_count: guestCount,
+          guest_full_name: fullName,
+          guest_email: email,
+          guest_phone: phone
+        })
+      });
 
-    if (!response.ok || !data.redirect_url) {
+      let data: any = {};
+      try {
+        data = await response.json();
+      } catch (e) {
+        // Failed to parse JSON (e.g. proxy served HTML error)
+      }
+
+      if (!response.ok || !data.redirect_url) {
+        setLoading(false);
+        setError(data.error || `Unable to start payment (Server status: ${response.status})`);
+        return;
+      }
+
+      window.location.href = data.redirect_url;
+    } catch (err) {
       setLoading(false);
-      setError(data.error || "Unable to start payment.");
-      return;
+      setError("Network error: Could not reach the booking server.");
+      console.error("Booking error:", err);
     }
-
-    window.location.href = data.redirect_url;
   }
 
   return (
@@ -78,6 +90,7 @@ export function BookingCheckout({
         <input
           type="date"
           required
+          min={new Date().toISOString().split("T")[0]}
           value={checkIn}
           onChange={(event) => setCheckIn(event.target.value)}
           className="rounded-md border border-stone-300 px-3 py-3"
@@ -88,6 +101,7 @@ export function BookingCheckout({
         <input
           type="date"
           required
+          min={checkIn || new Date().toISOString().split("T")[0]}
           value={checkOut}
           onChange={(event) => setCheckOut(event.target.value)}
           className="rounded-md border border-stone-300 px-3 py-3"

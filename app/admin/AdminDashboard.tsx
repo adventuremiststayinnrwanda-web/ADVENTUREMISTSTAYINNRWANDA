@@ -1,18 +1,33 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   BedDouble,
   CalendarCheck,
+  Check,
   CreditCard,
+  Eye,
+  EyeOff,
   Hotel,
+  ImagePlus,
   Loader2,
   Lock,
   LogOut,
+  Pencil,
+  Plus,
   Save,
-  TrendingUp
+  Star,
+  Trash2,
+  TrendingUp,
+  Users,
+  X,
+  RefreshCw,
+  Tag
 } from "lucide-react";
 import { formatCurrency } from "@/lib/data";
+
+/* ─────────────────────────── Types ─────────────────────────── */
 
 type HotelRow = {
   id: string;
@@ -21,6 +36,7 @@ type HotelRow = {
   country: string;
   status: string;
   price_from: number;
+  amenities?: string[];
 };
 
 type RoomRow = {
@@ -30,7 +46,11 @@ type RoomRow = {
   room_number: string | null;
   price_per_night: number;
   capacity: number;
+  bed_type: string | null;
+  room_size: string | null;
+  description: string | null;
   status: string;
+  amenities?: string[];
 };
 
 type BookingRow = {
@@ -45,6 +65,8 @@ type BookingRow = {
   total_amount: number;
   status: string;
   created_at: string;
+  room_id?: string;
+  hotel_id?: string;
 };
 
 type PaymentRow = {
@@ -55,6 +77,39 @@ type PaymentRow = {
   currency: string;
   status: string;
   paid_at: string | null;
+};
+
+type ReviewRow = {
+  id: string;
+  booking_id: string;
+  guest_name: string;
+  hotel_name: string;
+  rating: number;
+  comment: string;
+  status: string;
+  created_at: string;
+};
+
+type PartnershipRow = {
+  id: string;
+  name: string;
+  logo_url: string;
+  status: string;
+  created_at: string;
+};
+
+type OfferRow = {
+  id: string;
+  hotel_id: string | null;
+  room_id: string | null;
+  title: string;
+  description: string | null;
+  discount_type: "percentage" | "flat";
+  discount_value: number;
+  valid_from: string | null;
+  valid_until: string | null;
+  status: string;
+  created_at: string;
 };
 
 type DashboardData = {
@@ -68,64 +123,748 @@ type DashboardData = {
   rooms: RoomRow[];
   bookings: BookingRow[];
   payments: PaymentRow[];
+  reviews: ReviewRow[];
+  partnerships?: PartnershipRow[];
+  offers?: OfferRow[];
 };
 
+/* ─────────────────────── Constants ──────────────────────────── */
+
 const roomStatuses = ["available", "fully_booked", "maintenance"];
-const bookingStatuses = ["pending_payment", "confirmed", "checked_in", "completed", "cancelled", "refunded"];
+const bookingStatuses = [
+  "pending_payment",
+  "confirmed",
+  "checked_in",
+  "completed",
+  "cancelled",
+  "refunded"
+];
+
+const STATUS_COLORS: Record<string, string> = {
+  available: "bg-emerald-100 text-emerald-800",
+  fully_booked: "bg-red-100 text-red-800",
+  maintenance: "bg-amber-100 text-amber-800",
+  confirmed: "bg-emerald-100 text-emerald-800",
+  pending_payment: "bg-amber-100 text-amber-800",
+  checked_in: "bg-sky-100 text-sky-800",
+  completed: "bg-stone-100 text-stone-700",
+  cancelled: "bg-red-100 text-red-700",
+  refunded: "bg-purple-100 text-purple-700",
+  successful: "bg-emerald-100 text-emerald-800",
+  pending: "bg-amber-100 text-amber-800",
+  failed: "bg-red-100 text-red-800"
+};
+
+/* ─────────────────────── API helper ─────────────────────────── */
 
 async function apiFetch(path: string, init?: RequestInit) {
   const response = await fetch(path, {
     ...init,
-    headers: {
-      "content-type": "application/json",
-      ...(init?.headers || {})
-    }
+    headers: { "content-type": "application/json", ...(init?.headers || {}) }
   });
-  const data = await response.json();
 
-  if (!response.ok) {
-    throw new Error(data.error || "Request failed.");
-  }
+  let data: any = {};
+  try {
+    data = await response.json();
+  } catch {}
 
+  if (!response.ok) throw new Error(data.error || "Request failed.");
   return data;
 }
 
+function downloadCSV(filename: string, rows: Record<string, any>[]) {
+  if (!rows || !rows.length) return;
+  const headers = Object.keys(rows[0]);
+  const csvContent =
+    headers.join(",") +
+    "\n" +
+    rows
+      .map((row) =>
+        headers
+          .map((header) => {
+            let val = row[header];
+            if (val === null || val === undefined) val = "";
+            val = String(val).replace(/"/g, '""');
+            if (val.includes(",") || val.includes('"') || val.includes("\n")) {
+              val = `"${val}"`;
+            }
+            return val;
+          })
+          .join(",")
+      )
+      .join("\n");
+
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  link.setAttribute("href", url);
+  link.setAttribute("download", filename);
+  link.style.visibility = "hidden";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+/* ────────────────── Reusable Badge component ────────────────── */
+
+function StatusBadge({ status }: { status: string }) {
+  const cls = STATUS_COLORS[status] || "bg-stone-100 text-stone-700";
+  return (
+    <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${cls}`}>
+      {status.replace(/_/g, " ")}
+    </span>
+  );
+}
+
+/* ─────────────────── Image Compressor ────────────────────────── */
+
+function compressImage(file: File, maxWidth = 1200, maxHeight = 900, quality = 0.75): Promise<File> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new window.Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve(file);
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".webp", {
+                type: "image/webp",
+                lastModified: Date.now(),
+              });
+              resolve(compressedFile);
+            } else {
+              resolve(file);
+            }
+          },
+          "image/webp",
+          quality
+        );
+      };
+      img.onerror = () => resolve(file);
+    };
+    reader.onerror = () => resolve(file);
+  });
+}
+
+/* ──────────────────── Edit Room Modal ──────────────────────── */
+
+type EditRoomModalProps = {
+  room: RoomRow;
+  onClose: () => void;
+  onSaved: () => void;
+};
+
+function EditRoomModal({ room, onClose, onSaved }: EditRoomModalProps) {
+  const [form, setForm] = useState({
+    name: room.name,
+    room_number: room.room_number || "",
+    description: room.description || "",
+    price_per_night: String(room.price_per_night),
+    capacity: String(room.capacity),
+    bed_type: room.bed_type || "",
+    room_size: room.room_size || "",
+    status: room.status,
+    amenities: room.amenities || [] as string[],
+    imageFiles: [] as File[]
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError("");
+    try {
+      const compressedImages = await Promise.all(
+        form.imageFiles.map(file => compressImage(file))
+      );
+      const formData = new FormData();
+      Object.entries(form).forEach(([key, value]) => {
+        if (key === "imageFiles") {
+          compressedImages.forEach(file => formData.append("images", file));
+        } else if (key === "amenities") {
+          formData.append(key, JSON.stringify(value));
+        } else {
+          formData.append(key, String(value));
+        }
+      });
+      formData.append("id", room.id);
+
+      const response = await fetch("/api/admin/rooms", {
+        method: "PATCH",
+        body: formData
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed");
+
+      onSaved();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/60 px-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-stone-100 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-50">
+              <Pencil size={16} className="text-emerald-700" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-stone-500">Editing</p>
+              <h3 className="font-bold text-stone-900">{room.name}</h3>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-full p-1.5 text-stone-400 transition hover:bg-stone-100 hover:text-stone-700"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={save} className="p-6 overflow-y-auto">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-1.5">
+              <label className="text-xs font-semibold text-stone-600">Room Name</label>
+              <input
+                required
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                className="rounded-lg border border-stone-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <label className="text-xs font-semibold text-stone-600">Room Number</label>
+              <input
+                value={form.room_number}
+                onChange={(e) => setForm({ ...form, room_number: e.target.value })}
+                className="rounded-lg border border-stone-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
+                placeholder="e.g. 101"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <label className="text-xs font-semibold text-stone-600">Price per night (USD)</label>
+              <input
+                required
+                type="number"
+                min="1"
+                value={form.price_per_night}
+                onChange={(e) => setForm({ ...form, price_per_night: e.target.value })}
+                className="rounded-lg border border-stone-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <label className="text-xs font-semibold text-stone-600">Capacity (guests)</label>
+              <input
+                required
+                type="number"
+                min="1"
+                value={form.capacity}
+                onChange={(e) => setForm({ ...form, capacity: e.target.value })}
+                className="rounded-lg border border-stone-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <label className="text-xs font-semibold text-stone-600">Bed Type</label>
+              <input
+                value={form.bed_type}
+                onChange={(e) => setForm({ ...form, bed_type: e.target.value })}
+                className="rounded-lg border border-stone-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
+                placeholder="e.g. King bed"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <label className="text-xs font-semibold text-stone-600">Room Size</label>
+              <input
+                value={form.room_size}
+                onChange={(e) => setForm({ ...form, room_size: e.target.value })}
+                className="rounded-lg border border-stone-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
+                placeholder="e.g. 36 sqm"
+              />
+            </div>
+            <div className="col-span-2 grid gap-1.5">
+              <label className="text-xs font-semibold text-stone-600">Description</label>
+              <textarea
+                rows={2}
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                className="rounded-lg border border-stone-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
+              />
+            </div>
+            <div className="col-span-2 grid gap-1.5">
+              <label className="text-xs font-semibold text-stone-600">Status</label>
+              <select
+                value={form.status}
+                onChange={(e) => setForm({ ...form, status: e.target.value })}
+                className="rounded-lg border border-stone-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
+              >
+                {roomStatuses.map((s) => (
+                  <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
+                ))}
+              </select>
+            </div>
+            <div className="col-span-2 grid gap-1.5">
+              <label className="text-xs font-semibold text-stone-600">Upload New Images (Replacing existing)</label>
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={(e) => setForm({ ...form, imageFiles: Array.from(e.target.files || []) })}
+                className="rounded-lg border border-stone-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none file:mr-4 file:py-1.5 file:px-3.5 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+              />
+              {form.imageFiles.length > 0 && (
+                <p className="text-xs text-stone-500 mt-1">{form.imageFiles.length} files selected.</p>
+              )}
+            </div>
+            <div className="col-span-2">
+              <AmenitiesSelector selected={form.amenities} onChange={(a) => setForm({ ...form, amenities: a })} />
+            </div>
+          </div>
+
+          {error && (
+            <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+          )}
+
+          <div className="mt-5 flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg border border-stone-200 px-4 py-2.5 text-sm font-semibold text-stone-700 hover:bg-stone-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:bg-stone-300"
+            >
+              {saving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+              {saving ? "Saving…" : "Save Changes"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────── Delete Confirm Modal ─────────────────────── */
+
+type DeleteRoomModalProps = {
+  room: RoomRow;
+  onClose: () => void;
+  onDeleted: () => void;
+};
+
+function DeleteRoomModal({ room, onClose, onDeleted }: DeleteRoomModalProps) {
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState("");
+
+  async function confirm() {
+    setDeleting(true);
+    setError("");
+    try {
+      await apiFetch("/api/admin/rooms", {
+        method: "DELETE",
+        body: JSON.stringify({ id: room.id })
+      });
+      onDeleted();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete.");
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/60 px-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
+        <div className="p-6">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50">
+            <Trash2 size={22} className="text-red-600" />
+          </div>
+          <h3 className="mt-4 text-lg font-bold text-stone-900">Delete Room</h3>
+          <p className="mt-2 text-sm text-stone-600">
+            Are you sure you want to delete <span className="font-semibold">{room.name}</span>?
+            This action cannot be undone and will remove all associated data.
+          </p>
+          {error && (
+            <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+          )}
+          <div className="mt-6 flex justify-end gap-3">
+            <button
+              onClick={onClose}
+              className="rounded-lg border border-stone-200 px-4 py-2.5 text-sm font-semibold text-stone-700 hover:bg-stone-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirm}
+              disabled={deleting}
+              className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:bg-stone-300"
+            >
+              {deleting ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+              {deleting ? "Deleting…" : "Yes, Delete"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────────── Edit Hotel Modal ─────────────────────── */
+
+type EditHotelModalProps = {
+  hotel: HotelRow;
+  onClose: () => void;
+  onSaved: () => void;
+};
+
+function EditHotelModal({ hotel, onClose, onSaved }: EditHotelModalProps) {
+  const [form, setForm] = useState({
+    name: hotel.name,
+    city: hotel.city,
+    country: hotel.country,
+    price_from: String(hotel.price_from),
+    status: hotel.status,
+    amenities: hotel.amenities || [] as string[],
+    imageFiles: [] as File[]
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError("");
+    try {
+      const compressedImages = await Promise.all(
+        form.imageFiles.map(file => compressImage(file))
+      );
+      const formData = new FormData();
+      Object.entries(form).forEach(([key, value]) => {
+        if (key === "imageFiles") {
+          compressedImages.forEach(file => formData.append("images", file));
+        } else if (key === "amenities") {
+          formData.append(key, JSON.stringify(value));
+        } else {
+          formData.append(key, String(value));
+        }
+      });
+      formData.append("id", hotel.id);
+
+      const response = await fetch("/api/admin/hotels", {
+        method: "PATCH",
+        body: formData
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed");
+
+      onSaved();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/60 px-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-stone-100 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-50">
+              <Pencil size={16} className="text-emerald-700" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-stone-500">Editing</p>
+              <h3 className="font-bold text-stone-900">{hotel.name}</h3>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-full p-1.5 text-stone-400 transition hover:bg-stone-100 hover:text-stone-700"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={save} className="p-6 overflow-y-auto">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-1.5 col-span-2">
+              <label className="text-xs font-semibold text-stone-600">Hotel Name</label>
+              <input
+                required
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                className="rounded-lg border border-stone-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <label className="text-xs font-semibold text-stone-600">City</label>
+              <input
+                required
+                value={form.city}
+                onChange={(e) => setForm({ ...form, city: e.target.value })}
+                className="rounded-lg border border-stone-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <label className="text-xs font-semibold text-stone-600">Country</label>
+              <input
+                required
+                value={form.country}
+                onChange={(e) => setForm({ ...form, country: e.target.value })}
+                className="rounded-lg border border-stone-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <label className="text-xs font-semibold text-stone-600">Price From (USD)</label>
+              <input
+                required
+                type="number"
+                min="1"
+                value={form.price_from}
+                onChange={(e) => setForm({ ...form, price_from: e.target.value })}
+                className="rounded-lg border border-stone-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <label className="text-xs font-semibold text-stone-600">Status</label>
+              <select
+                value={form.status}
+                onChange={(e) => setForm({ ...form, status: e.target.value })}
+                className="rounded-lg border border-stone-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+            <div className="col-span-2 grid gap-1.5">
+              <label className="text-xs font-semibold text-stone-600">Upload New Images (Replacing existing)</label>
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={(e) => setForm({ ...form, imageFiles: Array.from(e.target.files || []) })}
+                className="rounded-lg border border-stone-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none file:mr-4 file:py-1.5 file:px-3.5 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+              />
+              {form.imageFiles.length > 0 && (
+                <p className="text-xs text-stone-500 mt-1">{form.imageFiles.length} files selected.</p>
+              )}
+            </div>
+            <div className="col-span-2">
+              <AmenitiesSelector selected={form.amenities} onChange={(a) => setForm({ ...form, amenities: a })} />
+            </div>
+          </div>
+
+          {error && (
+            <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+          )}
+
+          <div className="mt-5 flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg border border-stone-200 px-4 py-2.5 text-sm font-semibold text-stone-700 hover:bg-stone-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:bg-stone-300"
+            >
+              {saving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+              {saving ? "Saving…" : "Save Changes"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────── Amenities Selector ──────────────────────── */
+
+function AmenitiesSelector({ selected, onChange }: { selected: string[], onChange: (a: string[]) => void }) {
+  const [newAmenity, setNewAmenity] = useState("");
+  const predefined = ["WiFi", "Pool", "Parking", "Gym", "Restaurant", "Air conditioning", "TV", "Breakfast", "Coffee", "Security", "Mountain views"];
+  
+  const allAmenities = Array.from(new Set([...predefined, ...selected]));
+
+  const toggle = (amenity: string) => {
+    if (selected.includes(amenity)) onChange(selected.filter(a => a !== amenity));
+    else onChange([...selected, amenity]);
+  };
+
+  const addCustom = () => {
+    const trimmed = newAmenity.trim();
+    if (trimmed && !selected.includes(trimmed)) {
+      onChange([...selected, trimmed]);
+      setNewAmenity("");
+    }
+  };
+
+  return (
+    <div className="grid gap-2">
+      <label className="text-xs font-semibold text-stone-600">Amenities (Free Things)</label>
+      <div className="flex flex-wrap gap-2 mb-2">
+        {allAmenities.map(amenity => {
+          const isSelected = selected.includes(amenity);
+          return (
+            <button
+              key={amenity}
+              type="button"
+              onClick={() => toggle(amenity)}
+              className={`rounded-full px-3 py-1.5 text-xs font-medium transition border ${isSelected ? "bg-emerald-100 text-emerald-800 border-emerald-200" : "bg-stone-50 text-stone-600 border-stone-200 hover:bg-stone-100"}`}
+            >
+              {amenity}
+            </button>
+          );
+        })}
+      </div>
+      <div className="flex gap-2">
+        <input 
+          value={newAmenity}
+          onChange={(e) => setNewAmenity(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustom(); } }}
+          placeholder="Type new amenity..."
+          className="rounded-lg border border-stone-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none flex-1"
+        />
+        <button type="button" onClick={addCustom} className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-800">
+          Add
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────── Main Dashboard ────────────────────────── */
+
 export function AdminDashboard() {
-  const [email, setEmail] = useState("adventuremiststayinnrwanda@gmail.com");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState("");
   const [error, setError] = useState("");
   const [data, setData] = useState<DashboardData | null>(null);
+  const [activeTab, setActiveTab] = useState<"hotels" | "rooms" | "offers" | "bookings" | "payments" | "reviews" | "partnerships">("rooms");
+  const [bookingFilter, setBookingFilter] = useState<"all" | "successful" | "pending">("all");
+  const [editingRoom, setEditingRoom] = useState<RoomRow | null>(null);
+  const [deletingRoom, setDeletingRoom] = useState<RoomRow | null>(null);
+  const [editingHotel, setEditingHotel] = useState<HotelRow | null>(null);
+  const [deletingHotel, setDeletingHotel] = useState<HotelRow | null>(null);
+  const [editingOffer, setEditingOffer] = useState<OfferRow | null>(null);
+  const [deletingOffer, setDeletingOffer] = useState<OfferRow | null>(null);
+  const [showAddRoom, setShowAddRoom] = useState(false);
+  const [showAddHotel, setShowAddHotel] = useState(false);
+  const [showAddPartner, setShowAddPartner] = useState(false);
+  const [showAddOffer, setShowAddOffer] = useState(false);
+
+  const [offerForm, setOfferForm] = useState({
+    hotel_id: "",
+    room_id: "",
+    title: "",
+    description: "",
+    discount_type: "percentage",
+    discount_value: "",
+    valid_from: "",
+    valid_until: "",
+    status: "active"
+  });
+
   const [hotelForm, setHotelForm] = useState({
     name: "Adventure Mist Stay Inn Rwanda",
     city: "Kigali",
     country: "Rwanda",
     price_from: "65",
-    status: "active"
+    status: "active",
+    imageFiles: [] as File[],
+    amenities: [] as string[]
   });
+
   const [roomForm, setRoomForm] = useState({
     hotel_id: "",
     name: "",
     room_number: "",
     price_per_night: "65",
     capacity: "2",
-    status: "available"
+    bed_type: "",
+    room_size: "",
+    description: "",
+    status: "available",
+    imageFiles: [] as File[],
+    amenities: [] as string[]
+  });
+
+  const [partnerForm, setPartnerForm] = useState({
+    name: "",
+    logo_url: "",
+    status: "active"
   });
 
   const hotelById = useMemo(
-    () => new Map((data?.hotels || []).map((hotel) => [hotel.id, hotel])),
+    () => new Map((data?.hotels || []).map((h) => [h.id, h])),
     [data?.hotels]
   );
+
+  const filteredBookings = useMemo(() => {
+    return (data?.bookings || []).filter(b => {
+      if (bookingFilter === "all") return true;
+      if (bookingFilter === "successful") return ["confirmed", "checked_in", "completed"].includes(b.status);
+      if (bookingFilter === "pending") return ["pending_payment", "cancelled", "refunded"].includes(b.status);
+      return true;
+    });
+  }, [data?.bookings, bookingFilter]);
 
   async function loadDashboard() {
     setError("");
     const dashboard = (await apiFetch("/api/admin/dashboard")) as DashboardData;
     setData(dashboard);
-    setRoomForm((current) => ({
-      ...current,
-      hotel_id: current.hotel_id || dashboard.hotels[0]?.id || ""
+    setRoomForm((c) => ({
+      ...c,
+      hotel_id: c.hotel_id || dashboard.hotels[0]?.id || ""
     }));
   }
 
@@ -134,25 +873,20 @@ export function AdminDashboard() {
       try {
         const session = await apiFetch("/api/admin/session");
         setAuthenticated(session.authenticated);
-
-        if (session.authenticated) {
-          await loadDashboard();
-        }
-      } catch (sessionError) {
-        setError(sessionError instanceof Error ? sessionError.message : "Unable to load admin session.");
+        if (session.authenticated) await loadDashboard();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Unable to load session.");
       } finally {
         setLoading(false);
       }
     }
-
     boot();
   }, []);
 
-  async function login(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function login(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
     setSaving("login");
     setError("");
-
     try {
       await apiFetch("/api/admin/login", {
         method: "POST",
@@ -160,8 +894,8 @@ export function AdminDashboard() {
       });
       setAuthenticated(true);
       await loadDashboard();
-    } catch (loginError) {
-      setError(loginError instanceof Error ? loginError.message : "Login failed.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Login failed.");
     } finally {
       setSaving("");
     }
@@ -174,51 +908,212 @@ export function AdminDashboard() {
     setPassword("");
   }
 
-  async function addHotel(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function addHotel(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (hotelForm.imageFiles.length < 1) {
+      setError("Please provide at least 1 image for the hotel.");
+      return;
+    }
     setSaving("hotel");
     setError("");
-
     try {
-      await apiFetch("/api/admin/hotels", {
-        method: "POST",
-        body: JSON.stringify(hotelForm)
+      const compressedImages = await Promise.all(
+        hotelForm.imageFiles.map(file => compressImage(file))
+      );
+      const formData = new FormData();
+      Object.entries(hotelForm).forEach(([key, value]) => {
+        if (key === "imageFiles") {
+          compressedImages.forEach(file => formData.append("images", file));
+        } else if (key === "amenities") {
+          formData.append(key, JSON.stringify(value));
+        } else {
+          formData.append(key, String(value));
+        }
       });
+
+      const response = await fetch("/api/admin/hotels", {
+        method: "POST",
+        body: formData
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed");
+
       await loadDashboard();
-    } catch (hotelError) {
-      setError(hotelError instanceof Error ? hotelError.message : "Unable to add hotel.");
+      setShowAddHotel(false);
+      setHotelForm({
+        name: "Adventure Mist Stay Inn Rwanda",
+        city: "Kigali",
+        country: "Rwanda",
+        price_from: "65",
+        status: "active",
+        imageFiles: [],
+        amenities: []
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to add hotel.");
     } finally {
       setSaving("");
     }
   }
 
-  async function addRoom(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function addRoom(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (roomForm.imageFiles.length < 2) {
+      setError("Please provide at least 2 images for the room.");
+      return;
+    }
     setSaving("room");
     setError("");
+    try {
+      const compressedImages = await Promise.all(
+        roomForm.imageFiles.map(file => compressImage(file))
+      );
+      const formData = new FormData();
+      Object.entries(roomForm).forEach(([key, value]) => {
+        if (key === "imageFiles") {
+          compressedImages.forEach(file => formData.append("images", file));
+        } else if (key === "amenities") {
+          formData.append(key, JSON.stringify(value));
+        } else {
+          formData.append(key, String(value));
+        }
+      });
+
+      const response = await fetch("/api/admin/rooms", {
+        method: "POST",
+        body: formData
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed");
+
+      setRoomForm((c) => ({ ...c, name: "", room_number: "", description: "", imageFiles: [], amenities: [] }));
+      await loadDashboard();
+      setShowAddRoom(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to add room.");
+    } finally {
+      setSaving("");
+    }
+  }
+
+  async function addPartner(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSaving("partner");
+    setError("");
+    try {
+      await apiFetch("/api/admin/partnerships", {
+        method: "POST",
+        body: JSON.stringify(partnerForm)
+      });
+      setPartnerForm({ name: "", logo_url: "", status: "active" });
+      await loadDashboard();
+      setShowAddPartner(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to add partnership.");
+    } finally {
+      setSaving("");
+    }
+  }
+
+  async function deleteHotel(hotel: HotelRow) {
+    if (!confirm(`Delete hotel "${hotel.name}"? This cannot be undone.`)) return;
+    setSaving("delhotel_" + hotel.id);
+    try {
+      await apiFetch("/api/admin/hotels", {
+        method: "DELETE",
+        body: JSON.stringify({ id: hotel.id })
+      });
+      await loadDashboard();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to delete hotel.");
+    } finally {
+      setSaving("");
+    }
+  }
+
+  async function handleToggleRoomStatus(roomId: string, currentStatus: string) {
+    setSaving(roomId);
+    let nextStatus = "available";
+    if (currentStatus === "available") nextStatus = "fully_booked";
+    else if (currentStatus === "fully_booked") nextStatus = "maintenance";
 
     try {
       await apiFetch("/api/admin/rooms", {
-        method: "POST",
-        body: JSON.stringify(roomForm)
+        method: "PATCH",
+        body: JSON.stringify({ id: roomId, status: nextStatus })
       });
-      setRoomForm((current) => ({ ...current, name: "", room_number: "" }));
       await loadDashboard();
-    } catch (roomError) {
-      setError(roomError instanceof Error ? roomError.message : "Unable to add room.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to toggle room status.");
     } finally {
       setSaving("");
     }
   }
 
-  async function updateRoomStatus(room: RoomRow, status: string) {
-    setSaving(room.id);
-    await apiFetch("/api/admin/rooms", {
-      method: "PATCH",
-      body: JSON.stringify({ ...room, status })
-    });
-    await loadDashboard();
-    setSaving("");
+  async function submitOffer(e: FormEvent) {
+    e.preventDefault();
+    setSaving("offer");
+    try {
+      const body = {
+        hotel_id: offerForm.hotel_id || null,
+        room_id: offerForm.room_id || null,
+        title: offerForm.title,
+        description: offerForm.description || null,
+        discount_type: offerForm.discount_type,
+        discount_value: Number(offerForm.discount_value),
+        valid_from: offerForm.valid_from ? new Date(offerForm.valid_from).toISOString() : null,
+        valid_until: offerForm.valid_until ? new Date(offerForm.valid_until).toISOString() : null,
+        status: offerForm.status
+      };
+
+      if (editingOffer) {
+        await apiFetch("/api/admin/offers", {
+          method: "PATCH",
+          body: JSON.stringify({ id: editingOffer.id, ...body })
+        });
+        setEditingOffer(null);
+      } else {
+        await apiFetch("/api/admin/offers", {
+          method: "POST",
+          body: JSON.stringify(body)
+        });
+        setShowAddOffer(false);
+      }
+
+      setOfferForm({
+        hotel_id: "",
+        room_id: "",
+        title: "",
+        description: "",
+        discount_type: "percentage",
+        discount_value: "",
+        valid_from: "",
+        valid_until: "",
+        status: "active"
+      });
+
+      await loadDashboard();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save offer.");
+    } finally {
+      setSaving("");
+    }
+  }
+
+  async function deleteOffer(offerId: string) {
+    if (!confirm("Are you sure you want to delete this offer?")) return;
+    setSaving(offerId);
+    try {
+      await apiFetch("/api/admin/offers", {
+        method: "DELETE",
+        body: JSON.stringify({ id: offerId })
+      });
+      await loadDashboard();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to delete offer.");
+    } finally {
+      setSaving("");
+    }
   }
 
   async function updateBookingStatus(booking: BookingRow, status: string) {
@@ -231,289 +1126,1033 @@ export function AdminDashboard() {
     setSaving("");
   }
 
+  async function updateReviewStatus(reviewId: string, status: string) {
+    setSaving(reviewId);
+    try {
+      await apiFetch("/api/admin/reviews", {
+        method: "PATCH",
+        body: JSON.stringify({ id: reviewId, status })
+      });
+      await loadDashboard();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to update review status.");
+    } finally {
+      setSaving("");
+    }
+  }
+
+  async function deleteReview(reviewId: string) {
+    if (!confirm("Are you sure you want to delete this review?")) return;
+    setSaving(reviewId);
+    try {
+      await apiFetch("/api/admin/reviews", {
+        method: "DELETE",
+        body: JSON.stringify({ id: reviewId })
+      });
+      await loadDashboard();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to delete review.");
+    } finally {
+      setSaving("");
+    }
+  }
+
+  /* ── Loading screen ── */
   if (loading) {
     return (
-      <main className="grid min-h-[70vh] place-items-center px-4">
-        <Loader2 className="animate-spin text-emerald-700" />
+      <main className="grid min-h-[70vh] place-items-center">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="animate-spin text-emerald-600" size={32} />
+          <p className="text-sm text-stone-500">Loading dashboard…</p>
+        </div>
       </main>
     );
   }
 
+  /* ── Login screen ── */
   if (!authenticated) {
     return (
-      <main className="mx-auto grid min-h-[70vh] max-w-7xl place-items-center px-4 py-12 sm:px-6 lg:px-8">
-        <form onSubmit={login} className="w-full max-w-md rounded-lg border border-stone-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center gap-3">
-            <Lock className="text-emerald-700" />
-            <div>
-              <p className="font-semibold text-emerald-800">Admin login</p>
-              <h1 className="text-2xl font-bold text-stone-950">Adventure Mist controls</h1>
+      <main className="flex min-h-[85vh] items-center justify-center bg-gradient-to-br from-stone-50 to-emerald-50 px-4">
+        <div className="w-full max-w-md">
+          <div className="rounded-2xl border border-stone-200 bg-white p-8 shadow-xl">
+            <div className="flex flex-col items-center text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-700 shadow-lg">
+                <Lock size={24} className="text-white" />
+              </div>
+              <h1 className="mt-4 text-2xl font-bold text-stone-950">Admin Access</h1>
+              <p className="mt-1 text-sm text-stone-500">Adventure Mist Stay Inn Rwanda</p>
             </div>
+
+            <form onSubmit={login} className="mt-8 grid gap-4">
+              <div className="grid gap-1.5">
+                <label className="text-xs font-semibold text-stone-600">Email address</label>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="rounded-xl border border-stone-200 px-4 py-3 text-sm focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <label className="text-xs font-semibold text-stone-600">Password</label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full rounded-xl border border-stone-200 px-4 py-3 pr-12 text-sm focus:border-emerald-500 focus:outline-none"
+                    placeholder="••••••••"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 transition"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+              {error && (
+                <p className="rounded-xl bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</p>
+              )}
+              <button
+                disabled={saving === "login"}
+                className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 py-3.5 font-semibold text-white shadow-md hover:bg-emerald-800 disabled:bg-stone-300"
+              >
+                {saving === "login" ? (
+                  <Loader2 className="animate-spin" size={18} />
+                ) : (
+                  <Lock size={18} />
+                )}
+                {saving === "login" ? "Signing in…" : "Sign in"}
+              </button>
+              
+              <div className="mt-4 text-center">
+                <Link href="/" className="text-sm font-semibold text-emerald-700 hover:text-emerald-800">
+                  &larr; Back to Website
+                </Link>
+              </div>
+            </form>
           </div>
-          <label className="mt-6 grid gap-2">
-            <span className="text-sm font-semibold text-stone-800">Email</span>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              className="rounded-md border border-stone-300 px-3 py-3"
-            />
-          </label>
-          <label className="mt-4 grid gap-2">
-            <span className="text-sm font-semibold text-stone-800">Password</span>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="rounded-md border border-stone-300 px-3 py-3"
-            />
-          </label>
-          {error ? <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
-          <button
-            disabled={saving === "login"}
-            className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-700 px-4 py-3 font-semibold text-white disabled:bg-stone-400"
-          >
-            {saving === "login" ? <Loader2 className="animate-spin" size={18} /> : <Lock size={18} />}
-            Login
-          </button>
-        </form>
+        </div>
       </main>
     );
   }
 
+  /* ── Modals ── */
+  const stats = [
+    { label: "Total Bookings", value: data?.stats.bookings || 0, icon: CalendarCheck, color: "text-sky-600", bg: "bg-sky-50" },
+    { label: "Revenue Earned", value: formatCurrency(data?.stats.revenue || 0), icon: CreditCard, color: "text-emerald-600", bg: "bg-emerald-50" },
+    { label: "Available Rooms", value: data?.stats.availableRooms || 0, icon: BedDouble, color: "text-violet-600", bg: "bg-violet-50" },
+    { label: "Pending Payments", value: data?.stats.pendingPayments || 0, icon: TrendingUp, color: "text-amber-600", bg: "bg-amber-50" }
+  ];
+
   return (
-    <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <p className="font-semibold text-emerald-800">Admin dashboard</p>
-          <h1 className="mt-2 text-4xl font-bold text-stone-950">Adventure Mist management</h1>
-        </div>
-        <button
-          onClick={logout}
-          className="inline-flex items-center gap-2 rounded-md border border-stone-300 bg-white px-4 py-3 font-semibold text-stone-800"
-        >
-          <LogOut size={18} />
-          Logout
-        </button>
-      </div>
+    <>
+      {/* Edit/Delete Room modals */}
+      {editingRoom && (
+        <EditRoomModal room={editingRoom} onClose={() => setEditingRoom(null)} onSaved={loadDashboard} />
+      )}
+      {deletingRoom && (
+        <DeleteRoomModal room={deletingRoom} onClose={() => setDeletingRoom(null)} onDeleted={loadDashboard} />
+      )}
+      {/* Edit Hotel modal */}
+      {editingHotel && (
+        <EditHotelModal hotel={editingHotel} onClose={() => setEditingHotel(null)} onSaved={loadDashboard} />
+      )}
 
-      {error ? <p className="mt-5 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
-
-      <div className="mt-8 grid gap-5 md:grid-cols-4">
-        {[
-          { label: "Bookings", value: data?.stats.bookings || 0, icon: CalendarCheck },
-          { label: "Revenue", value: formatCurrency(data?.stats.revenue || 0), icon: CreditCard },
-          { label: "Available rooms", value: data?.stats.availableRooms || 0, icon: BedDouble },
-          { label: "Pending payments", value: data?.stats.pendingPayments || 0, icon: TrendingUp }
-        ].map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <article key={stat.label} className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
-              <Icon className="text-emerald-700" />
-              <p className="mt-4 text-3xl font-bold text-stone-950">{stat.value}</p>
-              <p className="mt-1 text-sm text-stone-600">{stat.label}</p>
-            </article>
-          );
-        })}
-      </div>
-
-      <div className="mt-8 grid gap-6 lg:grid-cols-2">
-        <form onSubmit={addHotel} className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
-          <h2 className="flex items-center gap-2 text-xl font-bold text-stone-950">
-            <Hotel size={20} />
-            Add hotel
-          </h2>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {(["name", "city", "country", "price_from"] as const).map((field) => (
-              <input
-                key={field}
-                value={hotelForm[field]}
-                onChange={(event) => setHotelForm({ ...hotelForm, [field]: event.target.value })}
-                className="rounded-md border border-stone-300 px-3 py-3"
-                placeholder={field.replace("_", " ")}
-              />
-            ))}
+      <main className="min-h-screen bg-stone-50">
+        {/* Top bar */}
+        <div className="border-b border-stone-200 bg-white">
+          <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-700">
+                <Hotel size={18} className="text-white" />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-stone-500">Admin Panel</p>
+                <h1 className="text-base font-bold text-stone-900">Adventure Mist Stay Inn Rwanda</h1>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/"
+                className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50"
+              >
+                View Website
+              </Link>
+              <button
+                onClick={logout}
+                className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50"
+              >
+                <LogOut size={15} />
+                Logout
+              </button>
+            </div>
           </div>
-          <button className="mt-4 inline-flex items-center gap-2 rounded-md bg-emerald-700 px-4 py-3 font-semibold text-white">
-            <Save size={18} />
-            {saving === "hotel" ? "Saving..." : "Save Hotel"}
-          </button>
-        </form>
-
-        <form onSubmit={addRoom} className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
-          <h2 className="flex items-center gap-2 text-xl font-bold text-stone-950">
-            <BedDouble size={20} />
-            Add room
-          </h2>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <select
-              value={roomForm.hotel_id}
-              onChange={(event) => setRoomForm({ ...roomForm, hotel_id: event.target.value })}
-              className="rounded-md border border-stone-300 px-3 py-3"
-            >
-              {(data?.hotels || []).map((hotel) => (
-                <option key={hotel.id} value={hotel.id}>
-                  {hotel.name}
-                </option>
-              ))}
-            </select>
-            <input
-              value={roomForm.name}
-              onChange={(event) => setRoomForm({ ...roomForm, name: event.target.value })}
-              className="rounded-md border border-stone-300 px-3 py-3"
-              placeholder="Room name"
-            />
-            <input
-              value={roomForm.room_number}
-              onChange={(event) => setRoomForm({ ...roomForm, room_number: event.target.value })}
-              className="rounded-md border border-stone-300 px-3 py-3"
-              placeholder="Room number"
-            />
-            <input
-              value={roomForm.price_per_night}
-              onChange={(event) => setRoomForm({ ...roomForm, price_per_night: event.target.value })}
-              className="rounded-md border border-stone-300 px-3 py-3"
-              placeholder="Price"
-            />
-            <input
-              value={roomForm.capacity}
-              onChange={(event) => setRoomForm({ ...roomForm, capacity: event.target.value })}
-              className="rounded-md border border-stone-300 px-3 py-3"
-              placeholder="Capacity"
-            />
-            <select
-              value={roomForm.status}
-              onChange={(event) => setRoomForm({ ...roomForm, status: event.target.value })}
-              className="rounded-md border border-stone-300 px-3 py-3"
-            >
-              {roomStatuses.map((status) => (
-                <option key={status}>{status}</option>
-              ))}
-            </select>
-          </div>
-          <button className="mt-4 inline-flex items-center gap-2 rounded-md bg-emerald-700 px-4 py-3 font-semibold text-white">
-            <Save size={18} />
-            {saving === "room" ? "Saving..." : "Save Room"}
-          </button>
-        </form>
-      </div>
-
-      <section className="mt-8 rounded-lg border border-stone-200 bg-white shadow-sm">
-        <div className="border-b border-stone-200 p-5">
-          <h2 className="text-xl font-bold text-stone-950">Rooms</h2>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="bg-stone-100 text-stone-700">
-              <tr>
-                <th className="p-4">Room</th>
-                <th className="p-4">Hotel</th>
-                <th className="p-4">Price</th>
-                <th className="p-4">Capacity</th>
-                <th className="p-4">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(data?.rooms || []).map((room) => (
-                <tr key={room.id} className="border-t border-stone-100">
-                  <td className="p-4 font-semibold text-stone-800">{room.name}</td>
-                  <td className="p-4 text-stone-700">{hotelById.get(room.hotel_id)?.name || "Hotel"}</td>
-                  <td className="p-4 text-stone-700">{formatCurrency(Number(room.price_per_night))}</td>
-                  <td className="p-4 text-stone-700">{room.capacity}</td>
-                  <td className="p-4">
+
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+
+          {error && (
+            <div className="mb-6 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+          )}
+
+          {/* Stats cards */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {stats.map((stat) => {
+              const Icon = stat.icon;
+              return (
+                <div key={stat.label} className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+                  <div className={`inline-flex h-10 w-10 items-center justify-center rounded-xl ${stat.bg}`}>
+                    <Icon size={20} className={stat.color} />
+                  </div>
+                  <p className="mt-4 text-2xl font-bold text-stone-950">{stat.value}</p>
+                  <p className="mt-1 text-xs font-medium text-stone-500">{stat.label}</p>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Add Hotel & Add Room quick-action buttons */}
+          <div className="mt-8 flex flex-wrap gap-3">
+            <button
+              onClick={() => setShowAddHotel((v) => !v)}
+              className="inline-flex items-center gap-2 rounded-xl bg-stone-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-stone-800"
+            >
+              <Plus size={16} />
+              {showAddHotel ? "Hide Hotel Form" : "Add Hotel"}
+            </button>
+            <button
+              onClick={() => setShowAddRoom((v) => !v)}
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800"
+            >
+              <Plus size={16} />
+              {showAddRoom ? "Hide Room Form" : "Add Room"}
+            </button>
+            <button
+              onClick={() => {
+                setEditingOffer(null);
+                setOfferForm({
+                  hotel_id: "",
+                  room_id: "",
+                  title: "",
+                  description: "",
+                  discount_type: "percentage",
+                  discount_value: "",
+                  valid_from: "",
+                  valid_until: "",
+                  status: "active"
+                });
+                setShowAddOffer(true);
+              }}
+              className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-700"
+            >
+              <Plus size={16} />
+              Add Offer
+            </button>
+          </div>
+
+          {/* Add Hotel Form Modal */}
+          {showAddHotel && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/60 px-4 backdrop-blur-sm" onClick={() => setShowAddHotel(false)}>
+              <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between border-b border-stone-100 px-6 py-4">
+                  <h2 className="flex items-center gap-2 font-bold text-stone-900">
+                    <Hotel size={18} className="text-stone-500" /> Add New Hotel
+                  </h2>
+                  <button onClick={() => setShowAddHotel(false)} className="rounded-full p-1.5 text-stone-400 transition hover:bg-stone-100 hover:text-stone-700">
+                    <X size={18} />
+                  </button>
+                </div>
+                <form onSubmit={addHotel} className="p-6 overflow-y-auto grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  {(["name", "city", "country", "price_from"] as const).map((field) => (
+                    <div key={field} className="grid gap-1">
+                      <label className="text-xs font-semibold capitalize text-stone-500">
+                        {field.replace("_", " ")} *
+                      </label>
+                      <input
+                        required
+                        type={field === "price_from" ? "number" : "text"}
+                        min={field === "price_from" ? "1" : undefined}
+                        value={hotelForm[field]}
+                        onChange={(e) => setHotelForm({ ...hotelForm, [field]: e.target.value })}
+                        className="rounded-lg border border-stone-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
+                        placeholder={field.replace("_", " ")}
+                      />
+                    </div>
+                  ))}
+                  <div className="sm:col-span-2 lg:col-span-4 grid gap-1">
+                    <label className="text-xs font-semibold text-stone-500">Upload Images</label>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={(e) => setHotelForm({ ...hotelForm, imageFiles: Array.from(e.target.files || []) })}
+                      className="rounded-lg border border-stone-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+                    />
+                    {hotelForm.imageFiles.length > 0 && (
+                      <p className="text-xs text-stone-500 mt-1">{hotelForm.imageFiles.length} files selected.</p>
+                    )}
+                  </div>
+                  <div className="sm:col-span-2 lg:col-span-4">
+                    <AmenitiesSelector selected={hotelForm.amenities} onChange={(a) => setHotelForm({ ...hotelForm, amenities: a })} />
+                  </div>
+                  <div className="sm:col-span-2 lg:col-span-4 flex justify-end gap-3 mt-2">
+                    <button type="button" onClick={() => setShowAddHotel(false)} className="rounded-lg border border-stone-200 px-4 py-2.5 text-sm font-semibold text-stone-700 hover:bg-stone-50">
+                      Cancel
+                    </button>
+                    <button className="inline-flex items-center gap-2 rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-stone-800">
+                      <Save size={15} />
+                      {saving === "hotel" ? "Saving…" : "Save Hotel"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Add Room Form Modal */}
+          {showAddRoom && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/60 px-4 backdrop-blur-sm" onClick={() => setShowAddRoom(false)}>
+              <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between border-b border-stone-100 px-6 py-4">
+                  <h2 className="flex items-center gap-2 font-bold text-stone-900">
+                    <BedDouble size={18} className="text-stone-500" /> Add New Room
+                  </h2>
+                  <button onClick={() => setShowAddRoom(false)} className="rounded-full p-1.5 text-stone-400 transition hover:bg-stone-100 hover:text-stone-700">
+                    <X size={18} />
+                  </button>
+                </div>
+                <form onSubmit={addRoom} className="p-6 overflow-y-auto grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid gap-1">
+                    <label className="text-xs font-semibold text-stone-500">Hotel</label>
                     <select
-                      value={room.status}
-                      disabled={saving === room.id}
-                      onChange={(event) => updateRoomStatus(room, event.target.value)}
-                      className="rounded-md border border-stone-300 px-3 py-2"
+                      value={roomForm.hotel_id}
+                      onChange={(e) => setRoomForm({ ...roomForm, hotel_id: e.target.value })}
+                      className="rounded-lg border border-stone-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
                     >
-                      {roomStatuses.map((status) => (
-                        <option key={status}>{status}</option>
+                      {(data?.hotels || []).map((h) => (
+                        <option key={h.id} value={h.id}>{h.name}</option>
                       ))}
                     </select>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className="mt-8 rounded-lg border border-stone-200 bg-white shadow-sm">
-        <div className="border-b border-stone-200 p-5">
-          <h2 className="text-xl font-bold text-stone-950">Bookings</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] text-left text-sm">
-            <thead className="bg-stone-100 text-stone-700">
-              <tr>
-                <th className="p-4">Reference</th>
-                <th className="p-4">Guest</th>
-                <th className="p-4">Dates</th>
-                <th className="p-4">Amount</th>
-                <th className="p-4">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(data?.bookings || []).map((booking) => (
-                <tr key={booking.id} className="border-t border-stone-100">
-                  <td className="p-4 font-semibold text-stone-800">{booking.booking_reference}</td>
-                  <td className="p-4 text-stone-700">
-                    {booking.guest_full_name}
-                    <span className="block text-stone-500">{booking.guest_email}</span>
-                  </td>
-                  <td className="p-4 text-stone-700">
-                    {booking.check_in_date} to {booking.check_out_date}
-                  </td>
-                  <td className="p-4 text-stone-700">{formatCurrency(Number(booking.total_amount))}</td>
-                  <td className="p-4">
+                  </div>
+                  {([
+                    ["name", "Room name *", "text", true],
+                    ["room_number", "Room number *", "text", true],
+                    ["price_per_night", "Price per night (USD) *", "number", true],
+                    ["capacity", "Capacity (guests) *", "number", true],
+                    ["bed_type", "Bed type", "text", false],
+                    ["room_size", "Room size", "text", false]
+                  ] as ["name" | "room_number" | "price_per_night" | "capacity" | "bed_type" | "room_size", string, string, boolean][]).map(([field, label, type, required]) => (
+                    <div key={field} className="grid gap-1">
+                      <label className="text-xs font-semibold text-stone-500">{label}</label>
+                      <input
+                        type={type}
+                        required={required}
+                        min={type === "number" ? "1" : undefined}
+                        value={roomForm[field]}
+                        onChange={(e) => setRoomForm({ ...roomForm, [field]: e.target.value })}
+                        className="rounded-lg border border-stone-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
+                        placeholder={label}
+                      />
+                    </div>
+                  ))}
+                  <div className="grid gap-1">
+                    <label className="text-xs font-semibold text-stone-500">Status</label>
                     <select
-                      value={booking.status}
-                      disabled={saving === booking.id}
-                      onChange={(event) => updateBookingStatus(booking, event.target.value)}
-                      className="rounded-md border border-stone-300 px-3 py-2"
+                      value={roomForm.status}
+                      onChange={(e) => setRoomForm({ ...roomForm, status: e.target.value })}
+                      className="rounded-lg border border-stone-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
                     >
-                      {bookingStatuses.map((status) => (
-                        <option key={status}>{status}</option>
-                      ))}
+                      {roomStatuses.map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
                     </select>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+                  </div>
+                  <div className="sm:col-span-2 lg:col-span-3 grid gap-1">
+                    <label className="text-xs font-semibold text-stone-500">Upload Images (minimum 2)</label>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={(e) => setRoomForm({ ...roomForm, imageFiles: Array.from(e.target.files || []) })}
+                      className="rounded-lg border border-stone-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+                    />
+                    {roomForm.imageFiles.length > 0 && (
+                      <p className="text-xs text-stone-500 mt-1">{roomForm.imageFiles.length} files selected.</p>
+                    )}
+                    {roomForm.imageFiles.length < 2 && roomForm.imageFiles.length > 0 && (
+                      <p className="text-xs text-amber-600 mt-1">Please select at least 2 images.</p>
+                    )}
+                  </div>
+                  <div className="sm:col-span-2 lg:col-span-3">
+                    <AmenitiesSelector selected={roomForm.amenities} onChange={(a) => setRoomForm({ ...roomForm, amenities: a })} />
+                  </div>
+                  <div className="sm:col-span-2 lg:col-span-3 grid gap-1">
+                    <label className="text-xs font-semibold text-stone-500">Description</label>
+                    <textarea
+                      rows={2}
+                      value={roomForm.description}
+                      onChange={(e) => setRoomForm({ ...roomForm, description: e.target.value })}
+                      className="rounded-lg border border-stone-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
+                      placeholder="Room description…"
+                    />
+                  </div>
+                  <div className="sm:col-span-2 lg:col-span-3 flex justify-end gap-3 mt-2">
+                    <button type="button" onClick={() => setShowAddRoom(false)} className="rounded-lg border border-stone-200 px-4 py-2.5 text-sm font-semibold text-stone-700 hover:bg-stone-50">
+                      Cancel
+                    </button>
+                    <button className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800">
+                      <Save size={15} />
+                      {saving === "room" ? "Saving…" : "Save Room"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
 
-      <section className="mt-8 rounded-lg border border-stone-200 bg-white shadow-sm">
-        <div className="border-b border-stone-200 p-5">
-          <h2 className="text-xl font-bold text-stone-950">Payments</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="bg-stone-100 text-stone-700">
-              <tr>
-                <th className="p-4">Gateway reference</th>
-                <th className="p-4">Amount</th>
-                <th className="p-4">Status</th>
-                <th className="p-4">Paid at</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(data?.payments || []).map((payment) => (
-                <tr key={payment.id} className="border-t border-stone-100">
-                  <td className="p-4 font-semibold text-stone-800">{payment.gateway_reference}</td>
-                  <td className="p-4 text-stone-700">{formatCurrency(Number(payment.amount))}</td>
-                  <td className="p-4 text-stone-700">{payment.status}</td>
-                  <td className="p-4 text-stone-700">{payment.paid_at || "Not paid yet"}</td>
-                </tr>
+          {/* Tabs */}
+          <div className="mt-8">
+            <div className="flex flex-wrap gap-1 rounded-xl bg-stone-100 p-1">
+              {([
+                ["hotels", "Hotels", Hotel, "teal"],
+                ["rooms", "Rooms", BedDouble, "emerald"],
+                ["offers", "Offers", Tag, "rose"],
+                ["bookings", "Bookings", CalendarCheck, "sky"],
+                ["payments", "Payments", CreditCard, "violet"],
+                ["reviews", "Reviews", Star, "amber"],
+                ["partnerships", "Partnerships", Users, "rose"]
+              ] as [typeof activeTab, string, any, string][]).map(([tab, label, Icon, color]) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                    activeTab === tab
+                      ? color === "teal" ? "bg-teal-600 text-white shadow"
+                        : color === "emerald" ? "bg-emerald-600 text-white shadow"
+                        : color === "sky" ? "bg-sky-600 text-white shadow"
+                        : color === "violet" ? "bg-violet-600 text-white shadow"
+                        : color === "amber" ? "bg-amber-500 text-white shadow"
+                        : "bg-rose-600 text-white shadow"
+                      : "text-stone-500 hover:text-stone-700 hover:bg-white"
+                  }`}
+                >
+                  <Icon size={15} />
+                  {label}
+                </button>
               ))}
-            </tbody>
-          </table>
+            </div>
+
+            {/* Hotels Table */}
+            {activeTab === "hotels" && (
+              <div className="mt-4 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+                <div className="border-b border-stone-100 px-6 py-4">
+                  <h2 className="font-bold text-stone-900">
+                    Hotels
+                    <span className="ml-2 rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
+                      {data?.hotels?.length || 0}
+                    </span>
+                  </h2>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[600px] text-left text-sm">
+                    <thead className="bg-teal-600 text-xs font-bold uppercase tracking-wide text-white">
+                      <tr>
+                        <th className="px-6 py-3">Hotel Name</th>
+                        <th className="px-6 py-3">City</th>
+                        <th className="px-6 py-3">Price From</th>
+                        <th className="px-6 py-3">Status</th>
+                        <th className="px-6 py-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100">
+                      {(data?.hotels || []).map((hotel) => (
+                        <tr key={hotel.id} className="hover:bg-stone-50/60 transition">
+                          <td className="px-6 py-4">
+                            <p className="font-semibold text-stone-900">{hotel.name}</p>
+                            <p className="text-xs text-stone-400">{hotel.country}</p>
+                          </td>
+                          <td className="px-6 py-4 text-stone-600">{hotel.city}</td>
+                          <td className="px-6 py-4 font-semibold text-stone-900">{formatCurrency(Number(hotel.price_from))}</td>
+                          <td className="px-6 py-4">
+                            <StatusBadge status={hotel.status} />
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => setEditingHotel(hotel)}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 hover:border-stone-300 transition"
+                              >
+                                <Pencil size={12} /> Edit
+                              </button>
+                              <button
+                                onClick={() => deleteHotel(hotel)}
+                                disabled={saving === "delhotel_" + hotel.id}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 transition disabled:opacity-50"
+                              >
+                                <Trash2 size={12} /> Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {(data?.hotels || []).length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-12 text-center text-sm text-stone-400">
+                            No hotels found. Add a hotel to get started.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Rooms Table */}
+            {activeTab === "rooms" && (
+              <div className="mt-4 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+                <div className="border-b border-stone-100 px-6 py-4">
+                  <h2 className="font-bold text-stone-900">
+                    Rooms
+                    <span className="ml-2 rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
+                      {data?.rooms?.length || 0}
+                    </span>
+                  </h2>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[700px] text-left text-sm">
+                    <thead className="bg-emerald-700 text-xs font-bold uppercase tracking-wide text-white">
+                      <tr>
+                        <th className="px-6 py-3">Room</th>
+                        <th className="px-6 py-3">Hotel</th>
+                        <th className="px-6 py-3">Price / night</th>
+                        <th className="px-6 py-3">Capacity</th>
+                        <th className="px-6 py-3">Status</th>
+                        <th className="px-6 py-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100">
+                      {(data?.rooms || []).map((room) => (
+                        <tr key={room.id} className="hover:bg-stone-50/60 transition">
+                          <td className="px-6 py-4">
+                            <p className="font-semibold text-stone-900">{room.name}</p>
+                            {room.room_number && (
+                              <p className="text-xs text-stone-400">#{room.room_number}</p>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-stone-600">
+                            {hotelById.get(room.hotel_id)?.name || "—"}
+                          </td>
+                          <td className="px-6 py-4 font-semibold text-stone-900">
+                            {formatCurrency(Number(room.price_per_night))}
+                          </td>
+                          <td className="px-6 py-4 text-stone-600">
+                            {room.capacity} guest{room.capacity !== 1 ? "s" : ""}
+                          </td>
+                          <td className="px-6 py-4">
+                            <StatusBadge status={room.status} />
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                disabled={saving === room.id}
+                                onClick={() => handleToggleRoomStatus(room.id, room.status)}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Cycle room status: Available -> Fully booked -> Maintenance"
+                              >
+                                {saving === room.id ? (
+                                  <Loader2 size={12} className="animate-spin" />
+                                ) : (
+                                  <RefreshCw size={12} />
+                                )}
+                                Status
+                              </button>
+                              <button
+                                onClick={() => setEditingRoom(room)}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 hover:border-stone-300 transition"
+                              >
+                                <Pencil size={12} />
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => setDeletingRoom(room)}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 transition"
+                              >
+                                <Trash2 size={12} />
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {(data?.rooms || []).length === 0 && (
+                        <tr>
+                          <td colSpan={6} className="px-6 py-12 text-center text-sm text-stone-400">
+                            No rooms found. Add a room to get started.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Offers Table */}
+            {activeTab === "offers" && (
+              <div className="mt-4 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+                <div className="border-b border-stone-100 px-6 py-4">
+                  <h2 className="font-bold text-stone-900">
+                    Offers &amp; Discounts
+                    <span className="ml-2 rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
+                      {data?.offers?.length || 0}
+                    </span>
+                  </h2>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[800px] text-left text-sm">
+                    <thead className="bg-rose-600 text-xs font-bold uppercase tracking-wide text-white">
+                      <tr>
+                        <th className="px-6 py-3">Title</th>
+                        <th className="px-6 py-3">Applies To</th>
+                        <th className="px-6 py-3">Discount</th>
+                        <th className="px-6 py-3">Valid From</th>
+                        <th className="px-6 py-3">Valid Until</th>
+                        <th className="px-6 py-3">Status</th>
+                        <th className="px-6 py-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100">
+                      {(data?.offers || []).map((offer) => {
+                        const roomName = (data?.rooms || []).find(r => r.id === offer.room_id)?.name;
+                        const hotelName = (data?.hotels || []).find(h => h.id === offer.hotel_id)?.name;
+                        return (
+                          <tr key={offer.id} className="hover:bg-stone-50/60 transition">
+                            <td className="px-6 py-4">
+                              <p className="font-semibold text-stone-900">{offer.title}</p>
+                              {offer.description && <p className="text-xs text-stone-400 mt-0.5">{offer.description}</p>}
+                            </td>
+                            <td className="px-6 py-4 text-stone-600">
+                              {roomName ? (
+                                <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                                  Room: {roomName}
+                                </span>
+                              ) : hotelName ? (
+                                <span className="inline-flex items-center gap-1 rounded bg-teal-50 px-2 py-0.5 text-xs font-semibold text-teal-700">
+                                  Hotel: {hotelName}
+                                </span>
+                              ) : "—"}
+                            </td>
+                            <td className="px-6 py-4 font-semibold text-rose-700">
+                              {offer.discount_type === "percentage"
+                                ? `${offer.discount_value}% off`
+                                : `$${offer.discount_value} off`}
+                            </td>
+                            <td className="px-6 py-4 text-stone-600 text-xs">
+                              {offer.valid_from ? new Date(offer.valid_from).toLocaleDateString() : "Any time"}
+                            </td>
+                            <td className="px-6 py-4 text-stone-600 text-xs">
+                              {offer.valid_until ? new Date(offer.valid_until).toLocaleDateString() : "No expiry"}
+                            </td>
+                            <td className="px-6 py-4">
+                              <StatusBadge status={offer.status} />
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => {
+                                    setEditingOffer(offer);
+                                    setOfferForm({
+                                      hotel_id: offer.hotel_id || "",
+                                      room_id: offer.room_id || "",
+                                      title: offer.title,
+                                      description: offer.description || "",
+                                      discount_type: offer.discount_type,
+                                      discount_value: String(offer.discount_value),
+                                      valid_from: offer.valid_from ? offer.valid_from.slice(0, 10) : "",
+                                      valid_until: offer.valid_until ? offer.valid_until.slice(0, 10) : "",
+                                      status: offer.status
+                                    });
+                                    setShowAddOffer(true);
+                                  }}
+                                  className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 transition"
+                                >
+                                  <Pencil size={12} /> Edit
+                                </button>
+                                <button
+                                  onClick={() => deleteOffer(offer.id)}
+                                  disabled={saving === offer.id}
+                                  className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 transition"
+                                >
+                                  {saving === offer.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                                  Delete
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {(data?.offers || []).length === 0 && (
+                        <tr>
+                          <td colSpan={7} className="px-6 py-12 text-center text-sm text-stone-400">
+                            No offers yet. Click "Add Offer" to create a discount.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Bookings Table */}
+            {activeTab === "bookings" && (
+              <div className="mt-4 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+                <div className="flex items-center justify-between border-b border-stone-100 px-6 py-4">
+                  <div className="flex items-center gap-3">
+                    <h2 className="font-bold text-stone-900">
+                      Bookings
+                      <span className="ml-2 rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
+                        {filteredBookings.length}
+                      </span>
+                    </h2>
+                    <div className="ml-4 flex gap-1 rounded-lg bg-stone-100 p-1">
+                      {(["all", "successful", "pending"] as const).map(f => (
+                        <button
+                          key={f}
+                          onClick={() => setBookingFilter(f)}
+                          className={`rounded-md px-3 py-1 text-xs font-semibold capitalize ${bookingFilter === f ? "bg-white shadow-sm text-stone-900" : "text-stone-500 hover:text-stone-700"}`}
+                        >
+                          {f}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => downloadCSV("bookings.csv", filteredBookings)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 transition"
+                  >
+                    Export CSV
+                  </button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[900px] text-left text-sm">
+                    <thead className="bg-sky-600 text-xs font-bold uppercase tracking-wide text-white">
+                      <tr>
+                        <th className="px-6 py-3">Reference</th>
+                        <th className="px-6 py-3">Guest</th>
+                        <th className="px-6 py-3">Dates</th>
+                        <th className="px-6 py-3">Amount</th>
+                        <th className="px-6 py-3">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100">
+                      {filteredBookings.map((booking) => (
+                        <tr key={booking.id} className="hover:bg-stone-50/60 transition">
+                          <td className="px-6 py-4 font-mono font-semibold text-stone-900 text-xs">
+                            {booking.booking_reference}
+                          </td>
+                          <td className="px-6 py-4">
+                            <p className="font-semibold text-stone-900">{booking.guest_full_name}</p>
+                            <p className="text-xs text-stone-400">{booking.guest_email}</p>
+                          </td>
+                          <td className="px-6 py-4 text-stone-600 text-xs">
+                            {booking.check_in_date} → {booking.check_out_date}
+                          </td>
+                          <td className="px-6 py-4 font-semibold text-stone-900">
+                            {formatCurrency(Number(booking.total_amount))}
+                          </td>
+                          <td className="px-6 py-4">
+                            <select
+                              value={booking.status}
+                              disabled={saving === booking.id}
+                              onChange={(e) => updateBookingStatus(booking, e.target.value)}
+                              className="rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-medium focus:border-emerald-500 focus:outline-none"
+                            >
+                              {bookingStatuses.map((s) => (
+                                <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
+                              ))}
+                            </select>
+                          </td>
+                        </tr>
+                      ))}
+                      {filteredBookings.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-12 text-center text-sm text-stone-400">
+                            No bookings match the selected filter.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Payments Table */}
+            {activeTab === "payments" && (
+              <div className="mt-4 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+                <div className="flex items-center justify-between border-b border-stone-100 px-6 py-4">
+                  <h2 className="font-bold text-stone-900">
+                    Payments
+                    <span className="ml-2 rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
+                      {data?.payments?.length || 0}
+                    </span>
+                  </h2>
+                  <button
+                    onClick={() => downloadCSV("payments.csv", data?.payments || [])}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 transition"
+                  >
+                    Export CSV
+                  </button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[700px] text-left text-sm">
+                    <thead className="bg-violet-700 text-xs font-bold uppercase tracking-wide text-white">
+                      <tr>
+                        <th className="px-6 py-3">Gateway Reference</th>
+                        <th className="px-6 py-3">Amount</th>
+                        <th className="px-6 py-3">Currency</th>
+                        <th className="px-6 py-3">Status</th>
+                        <th className="px-6 py-3">Paid At</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100">
+                      {(data?.payments || []).map((payment) => (
+                        <tr key={payment.id} className="hover:bg-stone-50/60 transition">
+                          <td className="px-6 py-4 font-mono text-xs text-stone-600">
+                            {payment.gateway_reference}
+                          </td>
+                          <td className="px-6 py-4 font-semibold text-stone-900">
+                            {formatCurrency(Number(payment.amount))}
+                          </td>
+                          <td className="px-6 py-4 text-stone-600">{payment.currency}</td>
+                          <td className="px-6 py-4">
+                            <StatusBadge status={payment.status} />
+                          </td>
+                          <td className="px-6 py-4 text-xs text-stone-500">
+                            {payment.paid_at
+                              ? new Date(payment.paid_at).toLocaleString()
+                              : "Not paid yet"}
+                          </td>
+                        </tr>
+                      ))}
+                      {(data?.payments || []).length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-12 text-center text-sm text-stone-400">
+                            No payments recorded yet.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Reviews Table */}
+            {activeTab === "reviews" && (
+              <div className="mt-4 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+                <div className="flex items-center justify-between border-b border-stone-100 px-6 py-4">
+                  <h2 className="font-bold text-stone-900">
+                    Customer Reviews
+                    <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                      {data?.reviews?.length || 0}
+                    </span>
+                  </h2>
+                  <p className="text-xs text-stone-400">Approve reviews before they appear on the site</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm text-stone-600">
+                    <thead className="bg-amber-500 text-xs font-bold uppercase tracking-wider text-white">
+                      <tr>
+                        <th className="px-6 py-3">Guest</th>
+                        <th className="px-6 py-3">Hotel</th>
+                        <th className="px-6 py-3">Rating</th>
+                        <th className="px-6 py-3">Comment</th>
+                        <th className="px-6 py-3">Status</th>
+                        <th className="px-6 py-3">Date</th>
+                        <th className="px-6 py-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100">
+                      {(data?.reviews || []).map((review) => (
+                        <tr key={review.id} className="hover:bg-amber-50/40 transition">
+                          <td className="px-6 py-4 font-semibold text-stone-900">
+                            {review.guest_name}
+                          </td>
+                          <td className="px-6 py-4 text-stone-600">{review.hotel_name}</td>
+                          <td className="px-6 py-4">
+                            <div className="flex gap-0.5 text-amber-500">
+                              {Array.from({ length: review.rating }).map((_, idx) => (
+                                <Star key={idx} size={15} fill="currentColor" />
+                              ))}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-stone-600 max-w-xs truncate" title={review.comment}>
+                            {review.comment}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                              review.status === "published"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : review.status === "pending"
+                                ? "bg-amber-100 text-amber-800"
+                                : "bg-stone-100 text-stone-700"
+                            }`}>
+                              {review.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-xs text-stone-500">
+                            {new Date(review.created_at).toLocaleDateString()}
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {review.status !== "published" && (
+                                <button
+                                  onClick={() => updateReviewStatus(review.id, "published")}
+                                  disabled={saving === review.id}
+                                  className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition"
+                                >
+                                  <Check size={11} /> Approve
+                                </button>
+                              )}
+                              {review.status !== "hidden" && (
+                                <button
+                                  onClick={() => updateReviewStatus(review.id, "hidden")}
+                                  disabled={saving === review.id}
+                                  className="inline-flex items-center gap-1 rounded-lg border border-stone-200 px-2.5 py-1 text-xs font-semibold text-stone-600 hover:bg-stone-50 disabled:opacity-50 transition"
+                                >
+                                  Hide
+                                </button>
+                              )}
+                              <button
+                                onClick={() => deleteReview(review.id)}
+                                disabled={saving === review.id}
+                                className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50 transition"
+                              >
+                                <Trash2 size={11} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {(data?.reviews || []).length === 0 && (
+                        <tr>
+                          <td colSpan={7} className="px-6 py-12 text-center text-sm text-stone-400">
+                            No reviews submitted yet.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Partnerships Table */}
+            {activeTab === "partnerships" && (
+              <div className="mt-4 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+                <div className="flex items-center justify-between border-b border-stone-100 px-6 py-4">
+                  <h2 className="font-bold text-stone-900">
+                    Partnerships
+                    <span className="ml-2 rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700">
+                      {data?.partnerships?.length || 0}
+                    </span>
+                  </h2>
+                  <button
+                    onClick={() => setShowAddPartner((v) => !v)}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700 transition"
+                  >
+                    <Plus size={14} /> Add Partner
+                  </button>
+                </div>
+                {showAddPartner && (
+                  <div className="border-b border-stone-100 bg-stone-50 px-6 py-4">
+                    <form onSubmit={addPartner} className="flex gap-3 items-end">
+                      <div className="grid gap-1 flex-1">
+                        <label className="text-xs font-semibold text-stone-500">Name</label>
+                        <input
+                          value={partnerForm.name}
+                          onChange={(e) => setPartnerForm({ ...partnerForm, name: e.target.value })}
+                          className="rounded-lg border border-stone-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                          required
+                        />
+                      </div>
+                      <div className="grid gap-1 flex-1">
+                        <label className="text-xs font-semibold text-stone-500">Logo URL</label>
+                        <input
+                          value={partnerForm.logo_url}
+                          onChange={(e) => setPartnerForm({ ...partnerForm, logo_url: e.target.value })}
+                          className="rounded-lg border border-stone-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                          required
+                        />
+                      </div>
+                      <button className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800">
+                        {saving === "partner" ? "Saving..." : "Save"}
+                      </button>
+                    </form>
+                  </div>
+                )}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-rose-600 text-xs font-bold uppercase tracking-wide text-white">
+                      <tr>
+                        <th className="px-6 py-3">Partner Name</th>
+                        <th className="px-6 py-3">Logo</th>
+                        <th className="px-6 py-3">Status</th>
+                        <th className="px-6 py-3">Added</th>
+                        <th className="px-6 py-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100">
+                      {(data?.partnerships || []).map((partner) => (
+                        <tr key={partner.id} className="hover:bg-stone-50/60 transition">
+                          <td className="px-6 py-4 font-semibold text-stone-900">{partner.name}</td>
+                          <td className="px-6 py-4">
+                            {partner.logo_url && (
+                              <img src={partner.logo_url} alt={partner.name} className="h-8 object-contain" />
+                            )}
+                          </td>
+                          <td className="px-6 py-4">
+                            <StatusBadge status={partner.status} />
+                          </td>
+                          <td className="px-6 py-4 text-xs text-stone-500">
+                            {new Date(partner.created_at).toLocaleDateString()}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <button
+                              onClick={async () => {
+                                if (confirm("Delete this partner?")) {
+                                  await apiFetch("/api/admin/partnerships", { method: "DELETE", body: JSON.stringify({ id: partner.id }) });
+                                  loadDashboard();
+                                }
+                              }}
+                              className="text-red-600 hover:text-red-800"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {(data?.partnerships || []).length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-12 text-center text-sm text-stone-400">
+                            No partnerships added.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      </section>
-    </main>
+      </main>
+    </>
   );
 }

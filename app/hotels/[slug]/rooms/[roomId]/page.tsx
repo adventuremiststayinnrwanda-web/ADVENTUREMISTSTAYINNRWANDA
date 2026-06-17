@@ -4,7 +4,7 @@ import { CalendarDays, QrCode, Users } from "lucide-react";
 import { BookingCheckout } from "@/components/BookingCheckout";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
-import { getHotel, getRoom } from "@/lib/data";
+import { getDbHotel, getDbRoom } from "@/lib/server/db";
 
 export default async function RoomDetailsPage({
   params
@@ -12,8 +12,8 @@ export default async function RoomDetailsPage({
   params: Promise<{ slug: string; roomId: string }>;
 }) {
   const { slug, roomId } = await params;
-  const hotel = getHotel(slug);
-  const room = getRoom(slug, roomId);
+  const hotel = await getDbHotel(slug);
+  const room = hotel ? hotel.rooms.find((r) => r.id === roomId) || null : null;
 
   if (!hotel || !room) {
     notFound();
@@ -26,7 +26,7 @@ export default async function RoomDetailsPage({
         <div className="grid gap-8 lg:grid-cols-[1fr_420px]">
           <section>
             <div className="relative min-h-[460px] overflow-hidden rounded-lg">
-              <Image src={room.image} alt={room.name} fill priority className="object-cover" />
+              <Image src={room.image} alt={room.name} fill priority sizes="(max-width: 1024px) 100vw, 828px" className="object-cover" />
             </div>
             <div className="mt-8">
               <p className="font-semibold text-emerald-800">{hotel.name}</p>
@@ -51,13 +51,39 @@ export default async function RoomDetailsPage({
 
           <aside className="h-fit rounded-lg border border-stone-200 bg-white p-6 shadow-sm">
             <h2 className="text-2xl font-bold text-stone-950">Guest checkout</h2>
-            <p className="mt-2 text-sm text-stone-600">No customer registration required.</p>
-            <BookingCheckout
-              hotelSlug={hotel.slug}
-              roomId={room.id}
-              roomPrice={room.price}
-              roomCapacity={room.capacity}
-            />
+            {room.status === "Available" ? (
+              <>
+                <p className="mt-2 text-sm text-stone-600">No customer registration required.</p>
+                <BookingCheckout
+                  hotelSlug={hotel.slug}
+                  roomId={room.id}
+                  roomPrice={room.price}
+                  roomCapacity={room.capacity}
+                />
+              </>
+            ) : (
+              <div className="mt-6 rounded-xl border border-red-200 bg-red-50/50 p-6 text-center shadow-sm">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600">
+                  <CalendarDays size={24} />
+                </div>
+                <h3 className="mt-4 text-lg font-bold text-stone-900">
+                  {room.status === "Fully booked" ? "This Room has Been Booked" : "Room Unavailable"}
+                </h3>
+                <p className="mt-2 text-sm text-stone-600">
+                  {room.status === "Fully booked"
+                    ? "This room is currently occupied by another guest. Please check back later or view other rooms."
+                    : "This room is currently undergoing maintenance and is not available for booking."}
+                </p>
+                <div className="mt-6">
+                  <a
+                    href={`/hotels/${hotel.slug}`}
+                    className="inline-flex w-full items-center justify-center rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-800 transition"
+                  >
+                    View Other Rooms
+                  </a>
+                </div>
+              </div>
+            )}
           </aside>
         </div>
       </main>

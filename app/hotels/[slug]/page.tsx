@@ -1,10 +1,13 @@
+export const dynamic = 'force-dynamic';
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { Mail, MapPin, Phone } from "lucide-react";
+import { Mail, MapPin, Phone, Star } from "lucide-react";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { RoomCard } from "@/components/RoomCard";
-import { amenityIcons, getHotel } from "@/lib/data";
+import { ReviewForm } from "@/components/ReviewForm";
+import { amenityIcons } from "@/lib/data";
+import { getDbHotel, getDbHotelReviews } from "@/lib/server/db";
 
 export default async function HotelDetailsPage({
   params
@@ -12,11 +15,13 @@ export default async function HotelDetailsPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const hotel = getHotel(slug);
+  const hotel = await getDbHotel(slug);
 
   if (!hotel) {
     notFound();
   }
+
+  const reviews = await getDbHotelReviews(hotel.id);
 
   return (
     <>
@@ -25,12 +30,12 @@ export default async function HotelDetailsPage({
         <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
           <div className="grid gap-4 lg:grid-cols-[1.4fr_0.8fr]">
             <div className="relative min-h-[420px] overflow-hidden rounded-lg">
-              <Image src={hotel.gallery[0]} alt={hotel.name} fill className="object-cover" priority />
+              <Image src={hotel.gallery[0]} alt={hotel.name} fill sizes="(max-width: 1024px) 100vw, 800px" className="object-cover" priority />
             </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
               {hotel.gallery.slice(1).map((image) => (
                 <div key={image} className="relative min-h-48 overflow-hidden rounded-lg">
-                  <Image src={image} alt={hotel.name} fill className="object-cover" />
+                  <Image src={image} alt={hotel.name} fill sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 460px" className="object-cover" />
                 </div>
               ))}
             </div>
@@ -84,6 +89,41 @@ export default async function HotelDetailsPage({
               {hotel.rooms.map((room) => (
                 <RoomCard key={room.id} hotelSlug={hotel.slug} room={room} />
               ))}
+              {hotel.rooms.length === 0 && (
+                <p className="text-center py-10 text-stone-500">No rooms available at this hotel.</p>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-stone-50 py-12 border-t border-stone-200">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <h2 className="text-3xl font-bold text-stone-950">Guest Reviews</h2>
+            <div className="mt-8 grid gap-8 lg:grid-cols-[1.5fr_1fr]">
+              <div className="grid gap-6">
+                {reviews.map((review) => (
+                  <article key={review.id} className="rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-bold text-stone-950">{review.name}</p>
+                        <p className="text-xs text-stone-500">{new Date(review.created_at).toLocaleDateString()}</p>
+                      </div>
+                      <div className="flex gap-1 text-amber-500">
+                        {Array.from({ length: review.rating }).map((_, index) => (
+                          <Star key={index} size={16} fill="currentColor" className="stroke-amber-500" />
+                        ))}
+                      </div>
+                    </div>
+                    <p className="mt-4 text-stone-700 text-sm leading-relaxed">{review.comment}</p>
+                  </article>
+                ))}
+                {reviews.length === 0 && (
+                  <p className="py-10 text-stone-500 text-center border border-dashed border-stone-200 bg-white rounded-xl">No reviews yet for this hotel.</p>
+                )}
+              </div>
+              <div>
+                <ReviewForm hotelId={hotel.id} />
+              </div>
             </div>
           </div>
         </section>
