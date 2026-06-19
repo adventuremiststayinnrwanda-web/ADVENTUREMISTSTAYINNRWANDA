@@ -64,7 +64,7 @@ export const hotels: Hotel[] = [
     id: "adventure-mist-stay-inn-rwanda",
     slug: "adventure-mist-stay-inn-rwanda",
     name: "Adventure Mist Stay Inn Rwanda",
-    city: "Kigali",
+    city: "Musanze",
     country: "Rwanda",
     rating: 4.8,
     priceFrom: 65,
@@ -76,9 +76,9 @@ export const hotels: Hotel[] = [
       "https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=1200&q=80"
     ],
     description:
-      "Adventure Mist Stay Inn Rwanda is a calm Kigali stay for travelers who want comfort, reliable service, and easy access to Rwanda's city experiences and outdoor adventures.",
-    address: "Kigali, Rwanda",
-    phone: "+250 700 000 000",
+      "Adventure Mist Stay Inn Rwanda is a calm Musanze stay for travelers who want comfort, reliable service, and easy access to Rwanda's city experiences and outdoor adventures.",
+    address: "Musanze, Ruhengeri, Rwanda",
+    phone: "+250 782 656 071",
     email: "adventuremiststayinnrwanda@gmail.com",
     amenities: [
       "WiFi",

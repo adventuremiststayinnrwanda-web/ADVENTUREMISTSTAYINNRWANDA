@@ -144,29 +144,16 @@ export default async function Home() {
 
         {partnerships.length > 0 && (
           <section className="bg-stone-100 py-12 relative overflow-hidden border-t border-b border-stone-200/50">
-            <div className="text-center">
-              <p className="font-bold text-stone-500 uppercase tracking-widest text-xs mb-6">Trusted by Governments & Companies</p>
-              
-              <div className="animate-marquee-container relative flex overflow-hidden w-full py-4 opacity-75">
-                <div className="animate-marquee flex items-center gap-12 whitespace-nowrap min-w-full">
-                  {/* First iteration */}
-                  {partnerships.map((partner) => (
-                    <div key={`${partner.id}-1`} className="flex flex-col items-center gap-2 px-4">
-                      {partner.logo_url && (
-                        <img src={partner.logo_url} alt={partner.name} className="h-10 object-contain grayscale hover:grayscale-0 transition duration-300" />
-                      )}
-                    </div>
-                  ))}
-                  
-                  {/* Second iteration (seamless loop) */}
-                  {partnerships.map((partner) => (
-                    <div key={`${partner.id}-2`} className="flex flex-col items-center gap-2 px-4">
-                      {partner.logo_url && (
-                        <img src={partner.logo_url} alt={partner.name} className="h-10 object-contain grayscale hover:grayscale-0 transition duration-300" />
-                      )}
-                    </div>
-                  ))}
-                </div>
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
+              <p className="font-bold text-stone-500 uppercase tracking-widest text-xs mb-8">Trusted by Governments & Companies</p>
+              <div className="flex flex-wrap justify-center items-center gap-10 opacity-75">
+                {partnerships.map((partner) => (
+                  <div key={partner.id} className="flex flex-col items-center gap-2 px-2">
+                    {partner.logo_url && (
+                      <img src={partner.logo_url} alt={partner.name} className="h-10 object-contain grayscale hover:grayscale-0 transition duration-350" />
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           </section>

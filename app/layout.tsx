@@ -7,7 +7,7 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Adventure Mist Stay Inn Rwanda",
-  description: "Premium hotel booking in Kigali",
+  description: "Premium hotel booking in Musanze, Ruhengeri, Rwanda",
   icons: {
     icon: "/logo.jpg",
     shortcut: "/logo.jpg",

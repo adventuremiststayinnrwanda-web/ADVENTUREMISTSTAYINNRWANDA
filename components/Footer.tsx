@@ -22,9 +22,9 @@ export function Footer() {
         <div>
           <h3 className="font-semibold">Contact</h3>
           <div className="mt-3 grid gap-2 text-sm text-stone-300">
-            <span>+250 700 000 000</span>
+            <span>+250 782 656 071</span>
             <span>adventuremiststayinnrwanda@gmail.com</span>
-            <span>Kigali, Rwanda</span>
+            <span>Musanze, Ruhengeri, Rwanda</span>
           </div>
         </div>
         <div>
