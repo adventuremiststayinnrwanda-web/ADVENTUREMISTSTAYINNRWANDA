@@ -1,9 +1,11 @@
+export const dynamic = 'force-dynamic';
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { RoomCard } from "@/components/RoomCard";
-import { hotels } from "@/lib/data";
+import { getDbHotels } from "@/lib/server/db";
 
-export default function RoomsPage() {
+export default async function RoomsPage() {
+  const hotels = await getDbHotels();
   const rooms = hotels.flatMap((hotel) => hotel.rooms.map((room) => ({ hotel, room })));
 
   return (

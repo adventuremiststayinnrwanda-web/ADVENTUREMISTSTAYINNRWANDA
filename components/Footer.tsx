@@ -30,7 +30,7 @@ export function Footer() {
         <div>
           <h3 className="font-semibold">Legal</h3>
           <div className="mt-3 grid gap-2 text-sm text-stone-300">
-            <span>Terms and Conditions</span>
+            <Link href="/refund-policy">Refund & Cancellation Policy</Link>
             <span>Privacy Policy</span>
             <span>Secure Payments</span>
           </div>

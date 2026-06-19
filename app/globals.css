@@ -88,3 +88,25 @@ textarea {
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
+
+/* ──────────────── Infinite Scrolling Marquee ──────────────── */
+@keyframes marquee {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  display: inline-flex;
+  gap: 3rem;
+  width: max-content;
+  animation: marquee 25s linear infinite;
+}
+
+.animate-marquee-container:hover .animate-marquee {
+  animation-play-state: paused;
+}
+
