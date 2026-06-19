@@ -89,4 +89,42 @@ textarea {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
+/* ──────────────── PDF / Print Styling ──────────────── */
+#printable-report {
+  display: none;
+}
+
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  body > *:not(#printable-report) {
+    display: none !important;
+  }
+  #printable-report {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  #printable-report table {
+    display: table !important;
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+  #printable-report tr {
+    display: table-row !important;
+    page-break-inside: avoid !important;
+  }
+  #printable-report th, #printable-report td {
+    display: table-cell !important;
+  }
+  #printable-report thead {
+    display: table-header-group !important;
+  }
+}
+
+
 

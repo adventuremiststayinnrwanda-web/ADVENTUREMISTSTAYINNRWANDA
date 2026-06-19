@@ -172,38 +172,93 @@ async function apiFetch(path: string, init?: RequestInit) {
   return data;
 }
 
-function downloadCSV(filename: string, rows: Record<string, any>[]) {
+function downloadPDF(
+  title: string,
+  rows: Record<string, any>[],
+  columns: { key: string; label: string; format?: (val: any, row?: any) => string }[]
+) {
   if (!rows || !rows.length) return;
-  const headers = Object.keys(rows[0]);
-  const csvContent =
-    headers.join(",") +
-    "\n" +
-    rows
-      .map((row) =>
-        headers
-          .map((header) => {
-            let val = row[header];
-            if (val === null || val === undefined) val = "";
-            val = String(val).replace(/"/g, '""');
-            if (val.includes(",") || val.includes('"') || val.includes("\n")) {
-              val = `"${val}"`;
-            }
-            return val;
-          })
-          .join(",")
-      )
-      .join("\n");
 
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const link = document.createElement("a");
-  const url = URL.createObjectURL(blob);
-  link.setAttribute("href", url);
-  link.setAttribute("download", filename);
-  link.style.visibility = "hidden";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  const printDiv = document.createElement("div");
+  printDiv.id = "printable-report";
+
+  const printDate = new Date().toLocaleString("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  });
+
+  const tableHeader = columns
+    .map(
+      (col) =>
+        `<th style="padding: 10px; border-bottom: 2px solid #e2e8f0; text-align: left; font-size: 11px; text-transform: uppercase; color: #475569; font-weight: 700; font-family: system-ui, -apple-system, sans-serif;">${col.label}</th>`
+    )
+    .join("");
+
+  const tableRows = rows
+    .map((row) => {
+      return (
+        `<tr style="border-bottom: 1px solid #f1f5f9;">` +
+        columns
+          .map((col) => {
+            let val = row[col.key];
+            if (col.format) {
+              val = col.format(val, row);
+            } else {
+              if (val === null || val === undefined) val = "";
+              val = String(val);
+            }
+            return `<td style="padding: 10px; font-size: 11px; color: #1e293b; font-family: system-ui, -apple-system, sans-serif;">${val}</td>`;
+          })
+          .join("") +
+        `</tr>`
+      );
+    })
+    .join("");
+
+  printDiv.innerHTML = `
+    <div style="font-family: system-ui, -apple-system, sans-serif; color: #0f172a; padding: 20px; max-width: 1000px; margin: 0 auto;">
+      <!-- Header Section -->
+      <div style="display: flex; justify-content: space-between; align-items: start; border-bottom: 3px solid #10b981; padding-bottom: 15px; margin-bottom: 20px;">
+        <div>
+          <h1 style="margin: 0; font-size: 22px; color: #065f46; font-weight: 800; letter-spacing: -0.5px;">ADVENTURE MIST STAY INN RWANDA</h1>
+          <p style="margin: 4px 0 0 0; font-size: 11px; color: #475569; font-weight: 500; line-height: 1.5;">
+            Musanze, Ruhengeri, Rwanda | Phone: +250 782 656 071 | Email: adventuremiststayinnrwanda@gmail.com
+          </p>
+        </div>
+        <div style="text-align: right;">
+          <h2 style="margin: 0; font-size: 16px; color: #1e293b; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">${title}</h2>
+          <p style="margin: 4px 0 0 0; font-size: 10px; color: #64748b;">Date Generated: ${printDate}</p>
+        </div>
+      </div>
+
+      <!-- Report Details / Table -->
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
+        <thead>
+          <tr style="background-color: #f8fafc;">
+            ${tableHeader}
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRows}
+        </tbody>
+      </table>
+
+      <!-- Footer Section -->
+      <div style="border-top: 1px solid #e2e8f0; padding-top: 15px; display: flex; justify-content: space-between; align-items: center; font-size: 9px; color: #94a3b8;">
+        <div>Confidential &mdash; Adventure Mist Stay Inn Rwanda &copy; ${new Date().getFullYear()}</div>
+        <div>Page 1 of 1</div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(printDiv);
+
+  setTimeout(() => {
+    window.print();
+    document.body.removeChild(printDiv);
+  }, 100);
 }
+
 
 /* ────────────────── Reusable Badge component ────────────────── */
 
@@ -1172,54 +1227,59 @@ export function AdminDashboard() {
   /* ── Login screen ── */
   if (!authenticated) {
     return (
-      <main className="flex min-h-[85vh] items-center justify-center bg-gradient-to-br from-stone-50 to-emerald-50 px-4">
-        <div className="w-full max-w-md">
-          <div className="rounded-2xl border border-stone-200 bg-white p-8 shadow-xl">
+      <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-stone-950 via-emerald-950 to-stone-900 px-4 py-12 relative overflow-hidden">
+        {/* Decorative background glow */}
+        <div className="absolute top-1/4 left-1/4 h-72 w-72 rounded-full bg-emerald-500/10 blur-[120px] pointer-events-none" />
+        <div className="absolute bottom-1/4 right-1/4 h-72 w-72 rounded-full bg-emerald-500/15 blur-[120px] pointer-events-none" />
+
+        <div className="w-full max-w-md relative z-10">
+          <div className="rounded-2xl glass-panel-dark p-8 shadow-2xl">
             <div className="flex flex-col items-center text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-700 shadow-lg">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 shadow-lg shadow-emerald-950/50">
                 <Lock size={24} className="text-white" />
               </div>
-              <h1 className="mt-4 text-2xl font-bold text-stone-950">Admin Access</h1>
-              <p className="mt-1 text-sm text-stone-500">Adventure Mist Stay Inn Rwanda</p>
+              <h1 className="mt-5 text-2xl font-bold text-white tracking-tight">Admin Access</h1>
+              <p className="mt-1 text-sm text-stone-400">Adventure Mist Stay Inn Rwanda</p>
             </div>
 
             <form onSubmit={login} className="mt-8 grid gap-4">
               <div className="grid gap-1.5">
-                <label className="text-xs font-semibold text-stone-600">Email address</label>
+                <label className="text-xs font-semibold text-stone-300">Email address</label>
                 <input
                   type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="rounded-xl border border-stone-200 px-4 py-3 text-sm focus:border-emerald-500 focus:outline-none"
+                  className="rounded-xl border border-stone-850 bg-stone-900/60 px-4 py-3 text-sm text-white placeholder-stone-500 focus:border-emerald-500 focus:outline-none transition border-stone-700"
+                  placeholder="admin@adventuremist.com"
                 />
               </div>
               <div className="grid gap-1.5">
-                <label className="text-xs font-semibold text-stone-600">Password</label>
+                <label className="text-xs font-semibold text-stone-300">Password</label>
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full rounded-xl border border-stone-200 px-4 py-3 pr-12 text-sm focus:border-emerald-500 focus:outline-none"
+                    className="w-full rounded-xl border border-stone-850 bg-stone-900/60 px-4 py-3 pr-12 text-sm text-white placeholder-stone-500 focus:border-emerald-500 focus:outline-none transition border-stone-700"
                     placeholder="••••••••"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(v => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 transition"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-200 transition"
                   >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
               </div>
               {error && (
-                <p className="rounded-xl bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</p>
+                <p className="rounded-xl bg-red-950/50 border border-red-900/50 px-4 py-2.5 text-sm text-red-300">{error}</p>
               )}
               <button
                 disabled={saving === "login"}
-                className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 py-3.5 font-semibold text-white shadow-md hover:bg-emerald-800 disabled:bg-stone-300"
+                className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl py-3.5 font-bold text-white shining-button disabled:bg-stone-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
               >
                 {saving === "login" ? (
                   <Loader2 className="animate-spin" size={18} />
@@ -1229,8 +1289,8 @@ export function AdminDashboard() {
                 {saving === "login" ? "Signing in…" : "Sign in"}
               </button>
               
-              <div className="mt-4 text-center">
-                <Link href="/" className="text-sm font-semibold text-emerald-700 hover:text-emerald-800">
+              <div className="mt-5 text-center">
+                <Link href="/" className="text-sm font-semibold text-emerald-400 hover:text-emerald-300 transition">
                   &larr; Back to Website
                 </Link>
               </div>
@@ -1263,97 +1323,147 @@ export function AdminDashboard() {
         <EditHotelModal hotel={editingHotel} onClose={() => setEditingHotel(null)} onSaved={loadDashboard} />
       )}
 
-      <main className="min-h-screen bg-stone-50">
-        {/* Top bar */}
-        <div className="border-b border-stone-200 bg-white">
-          <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+      <main className="min-h-screen bg-stone-50 flex">
+        {/* Left Sidebar */}
+        <aside className="w-64 bg-stone-900 text-stone-100 flex flex-col fixed inset-y-0 left-0 border-r border-stone-800 z-20">
+          <div className="p-6 border-b border-stone-800">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-700">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 shadow-md">
                 <Hotel size={18} className="text-white" />
               </div>
               <div>
-                <p className="text-xs font-medium text-stone-500">Admin Panel</p>
-                <h1 className="text-base font-bold text-stone-900">Adventure Mist Stay Inn Rwanda</h1>
+                <h1 className="text-sm font-bold text-white tracking-wide leading-none">ADVENTURE MIST</h1>
+                <p className="text-[10px] font-semibold text-stone-400 mt-1">Stay Inn Rwanda</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <Link
-                href="/"
-                className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50"
-              >
-                View Website
-              </Link>
+          </div>
+          
+          <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
+            {([
+              ["hotels", "Hotels", Hotel],
+              ["rooms", "Rooms", BedDouble],
+              ["offers", "Offers", Tag],
+              ["bookings", "Bookings", CalendarCheck],
+              ["payments", "Payments", CreditCard],
+              ["reviews", "Reviews", Star],
+              ["partnerships", "Partnerships", Users]
+            ] as [typeof activeTab, string, any][]).map(([tab, label, Icon]) => (
               <button
-                onClick={logout}
-                className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50"
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition ${
+                  activeTab === tab
+                    ? "bg-emerald-600 text-white shadow-md"
+                    : "text-stone-400 hover:text-white hover:bg-stone-800/80"
+                }`}
               >
-                <LogOut size={15} />
-                Logout
+                <Icon size={16} />
+                <span>{label}</span>
+              </button>
+            ))}
+          </nav>
+
+          <div className="p-4 border-t border-stone-800 space-y-2">
+            <Link
+              href="/"
+              target="_blank"
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-stone-700 bg-stone-800 px-4 py-2.5 text-xs font-semibold text-stone-300 hover:bg-stone-700 transition"
+            >
+              View Website
+            </Link>
+            <button
+              onClick={logout}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-red-650 hover:bg-red-750 px-4 py-2.5 text-xs font-semibold text-white transition bg-red-650 hover:bg-red-700"
+            >
+              <LogOut size={14} />
+              Logout
+            </button>
+          </div>
+        </aside>
+
+        {/* Main Content Area */}
+        <div className="flex-1 ml-64 min-h-screen flex flex-col">
+          {/* Top Bar */}
+          <header className="sticky top-0 z-10 border-b border-stone-200 bg-white px-6 py-4 shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-stone-400 uppercase tracking-wider">Admin Panel &rarr;</p>
+              <h1 className="text-lg font-bold text-stone-900 capitalize">
+                {activeTab} Management
+              </h1>
+            </div>
+            
+            {/* Quick Action Buttons */}
+            <div className="flex items-center gap-2.5">
+              <button
+                onClick={() => setShowAddHotel((v) => !v)}
+                className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3.5 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-50 shadow-sm transition"
+              >
+                <Plus size={14} />
+                {showAddHotel ? "Hide Hotel Form" : "Add Hotel"}
+              </button>
+              <button
+                onClick={() => setShowAddRoom((v) => !v)}
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-emerald-700 shadow-md transition"
+              >
+                <Plus size={14} />
+                {showAddRoom ? "Hide Room Form" : "Add Room"}
+              </button>
+              <button
+                onClick={() => {
+                  setEditingOffer(null);
+                  setOfferForm({
+                    hotel_id: "",
+                    room_id: "",
+                    title: "",
+                    description: "",
+                    discount_type: "percentage",
+                    discount_value: "",
+                    valid_from: "",
+                    valid_until: "",
+                    status: "active"
+                  });
+                  setShowAddOffer(true);
+                }}
+                className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-rose-700 shadow-md transition"
+              >
+                <Plus size={14} />
+                Add Offer
               </button>
             </div>
-          </div>
-        </div>
+          </header>
 
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          {/* Page Body Container */}
+          <div className="p-6 max-w-7xl w-full mx-auto space-y-6">
+            {error && (
+              <div className="rounded-xl bg-red-50 border border-red-150 px-4 py-3 text-sm text-red-700">{error}</div>
+            )}
 
-          {error && (
-            <div className="mb-6 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
-          )}
-
-          {/* Stats cards */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {stats.map((stat) => {
-              const Icon = stat.icon;
-              return (
-                <div key={stat.label} className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-                  <div className={`inline-flex h-10 w-10 items-center justify-center rounded-xl ${stat.bg}`}>
-                    <Icon size={20} className={stat.color} />
+            {/* Redesigned Stat Cards */}
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {stats.map((stat) => {
+                const Icon = stat.icon;
+                const iconGradients: Record<string, string> = {
+                  "Total Bookings": "from-sky-500 to-blue-600 text-white shadow-md",
+                  "Revenue Earned": "from-emerald-500 to-teal-600 text-white shadow-md",
+                  "Available Rooms": "from-violet-500 to-indigo-600 text-white shadow-md",
+                  "Pending Payments": "from-amber-500 to-orange-600 text-white shadow-md"
+                };
+                const gradCls = iconGradients[stat.label] || "from-stone-500 to-stone-600 text-white";
+                return (
+                  <div key={stat.label} className="rounded-2xl border border-stone-200/80 bg-white p-5 shadow-sm hover:shadow-md hover:border-stone-300 transition duration-300">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="text-xs font-bold text-stone-400 uppercase tracking-wider">{stat.label}</p>
+                        <p className="mt-2.5 text-2xl font-bold text-stone-900 tracking-tight">{stat.value}</p>
+                      </div>
+                      <div className={`flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ${gradCls} shadow-lg`}>
+                        <Icon size={20} />
+                      </div>
+                    </div>
                   </div>
-                  <p className="mt-4 text-2xl font-bold text-stone-950">{stat.value}</p>
-                  <p className="mt-1 text-xs font-medium text-stone-500">{stat.label}</p>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Add Hotel & Add Room quick-action buttons */}
-          <div className="mt-8 flex flex-wrap gap-3">
-            <button
-              onClick={() => setShowAddHotel((v) => !v)}
-              className="inline-flex items-center gap-2 rounded-xl bg-stone-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-stone-800"
-            >
-              <Plus size={16} />
-              {showAddHotel ? "Hide Hotel Form" : "Add Hotel"}
-            </button>
-            <button
-              onClick={() => setShowAddRoom((v) => !v)}
-              className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800"
-            >
-              <Plus size={16} />
-              {showAddRoom ? "Hide Room Form" : "Add Room"}
-            </button>
-            <button
-              onClick={() => {
-                setEditingOffer(null);
-                setOfferForm({
-                  hotel_id: "",
-                  room_id: "",
-                  title: "",
-                  description: "",
-                  discount_type: "percentage",
-                  discount_value: "",
-                  valid_from: "",
-                  valid_until: "",
-                  status: "active"
-                });
-                setShowAddOffer(true);
-              }}
-              className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-700"
-            >
-              <Plus size={16} />
-              Add Offer
-            </button>
-          </div>
+                );
+              })}
+            </div>
 
           {/* Add Hotel Form Modal */}
           {showAddHotel && (
@@ -1513,37 +1623,8 @@ export function AdminDashboard() {
             </div>
           )}
 
-          {/* Tabs */}
-          <div className="mt-8">
-            <div className="flex flex-wrap gap-1 rounded-xl bg-stone-100 p-1">
-              {([
-                ["hotels", "Hotels", Hotel, "teal"],
-                ["rooms", "Rooms", BedDouble, "emerald"],
-                ["offers", "Offers", Tag, "rose"],
-                ["bookings", "Bookings", CalendarCheck, "sky"],
-                ["payments", "Payments", CreditCard, "violet"],
-                ["reviews", "Reviews", Star, "amber"],
-                ["partnerships", "Partnerships", Users, "rose"]
-              ] as [typeof activeTab, string, any, string][]).map(([tab, label, Icon, color]) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
-                    activeTab === tab
-                      ? color === "teal" ? "bg-teal-600 text-white shadow"
-                        : color === "emerald" ? "bg-emerald-600 text-white shadow"
-                        : color === "sky" ? "bg-sky-600 text-white shadow"
-                        : color === "violet" ? "bg-violet-600 text-white shadow"
-                        : color === "amber" ? "bg-amber-500 text-white shadow"
-                        : "bg-rose-600 text-white shadow"
-                      : "text-stone-500 hover:text-stone-700 hover:bg-white"
-                  }`}
-                >
-                  <Icon size={15} />
-                  {label}
-                </button>
-              ))}
-            </div>
+          {/* Tab Content Wrapper */}
+          <div className="mt-2">
 
             {/* Hotels Table */}
             {activeTab === "hotels" && (
@@ -1832,10 +1913,32 @@ export function AdminDashboard() {
                     </div>
                   </div>
                   <button
-                    onClick={() => downloadCSV("bookings.csv", filteredBookings)}
+                    onClick={() => {
+                      const bookingColumns = [
+                        { key: "booking_reference", label: "Reference" },
+                        { key: "guest_full_name", label: "Guest Name" },
+                        { key: "guest_email", label: "Email" },
+                        { key: "guest_phone", label: "Phone" },
+                        { key: "check_in_date", label: "Check-in" },
+                        { key: "check_out_date", label: "Check-out" },
+                        { key: "guest_count", label: "Guests" },
+                        { 
+                          key: "total_amount", 
+                          label: "Total Amount", 
+                          format: (val: any) => formatCurrency(Number(val)) 
+                        },
+                        { key: "status", label: "Status", format: (val: any) => String(val).toUpperCase().replace(/_/g, " ") },
+                        { 
+                          key: "created_at", 
+                          label: "Booked On", 
+                          format: (val: any) => new Date(val).toLocaleDateString() 
+                        }
+                      ];
+                      downloadPDF("Bookings Report", filteredBookings, bookingColumns);
+                    }}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 transition"
                   >
-                    Export CSV
+                    Export PDF
                   </button>
                 </div>
                 <div className="overflow-x-auto">
@@ -1903,10 +2006,35 @@ export function AdminDashboard() {
                     </span>
                   </h2>
                   <button
-                    onClick={() => downloadCSV("payments.csv", data?.payments || [])}
+                    onClick={() => {
+                      const paymentColumns = [
+                        { key: "gateway_reference", label: "Gateway Reference" },
+                        { 
+                          key: "booking_id", 
+                          label: "Booking Ref", 
+                          format: (val: any) => {
+                            const ref = data?.bookings?.find(b => b.id === val)?.booking_reference;
+                            return ref || val || "N/A";
+                          } 
+                        },
+                        { 
+                          key: "amount", 
+                          label: "Amount", 
+                          format: (val: any) => formatCurrency(Number(val)) 
+                        },
+                        { key: "currency", label: "Currency" },
+                        { key: "status", label: "Status", format: (val: any) => String(val).toUpperCase() },
+                        { 
+                          key: "paid_at", 
+                          label: "Paid At", 
+                          format: (val: any) => val ? new Date(val).toLocaleString() : "Not paid yet" 
+                        }
+                      ];
+                      downloadPDF("Payments Report", data?.payments || [], paymentColumns);
+                    }}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 transition"
                   >
-                    Export CSV
+                    Export PDF
                   </button>
                 </div>
                 <div className="overflow-x-auto">
@@ -2151,6 +2279,7 @@ export function AdminDashboard() {
               </div>
             )}
           </div>
+        </div>
         </div>
       </main>
     </>
