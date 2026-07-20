@@ -10,7 +10,8 @@ export function Header() {
           <div className="relative h-10 w-10 overflow-hidden rounded-md border border-stone-200 bg-white">
             <Image src="/logo.jpg" alt="Adventure Mist Stay Inn Rwanda" fill sizes="40px" className="object-cover" />
           </div>
-          <span>Adventure Mist Stay Inn Rwanda</span>
+          <span className="hidden sm:inline">Adventure Mist Stay Inn Rwanda</span>
+          <span className="inline sm:hidden">Adventure Mist</span>
         </Link>
         <div className="hidden items-center gap-6 text-sm font-medium text-stone-700 md:flex">
           <Link href="/">Home</Link>

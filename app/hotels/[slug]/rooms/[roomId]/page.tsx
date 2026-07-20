@@ -59,6 +59,7 @@ export default async function RoomDetailsPage({
                   roomId={room.id}
                   roomPrice={room.price}
                   roomCapacity={room.capacity}
+                  roomName={room.name}
                 />
               </>
             ) : (

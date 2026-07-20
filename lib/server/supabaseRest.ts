@@ -7,9 +7,23 @@
  * continue to work without changes.
  */
 
-// Offset Date.now by 5 minutes to absorb any clock skew with Supabase servers
-const _originalNow = Date.now;
-Date.now = () => _originalNow() - 300000;
+// Patch global Date to absorb any clock skew with Supabase servers (since V8 Date constructor doesn't use Date.now internally)
+const OriginalDate = globalThis.Date;
+class PatchedDate extends OriginalDate {
+  constructor(...args: any[]) {
+    if (args.length === 0) {
+      super(OriginalDate.now() - 300000); // 5 minutes back
+    } else {
+      // @ts-ignore
+      super(...args);
+    }
+  }
+}
+PatchedDate.now = () => OriginalDate.now() - 300000;
+PatchedDate.UTC = OriginalDate.UTC;
+PatchedDate.parse = OriginalDate.parse;
+
+globalThis.Date = PatchedDate as any;
 
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 

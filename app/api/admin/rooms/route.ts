@@ -216,7 +216,45 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Room ID is required." }, { status: 400 });
     }
 
-    await supabaseRest(`rooms?id=eq.${encodeURIComponent(body.id)}`, {
+    const roomIdEscaped = encodeURIComponent(body.id);
+
+    // 1. Fetch all bookings for this room
+    const bookings = await supabaseRest<Array<{ id: string }>>(`bookings?room_id=eq.${roomIdEscaped}&select=id`).catch(() => []);
+
+    if (Array.isArray(bookings) && bookings.length > 0) {
+      const bookingIds = bookings.map(b => b.id);
+      
+      // Delete child records for each booking (payments and reviews)
+      for (const bookingId of bookingIds) {
+        const bookingIdEscaped = encodeURIComponent(bookingId);
+        
+        await supabaseRest(`reviews?booking_id=eq.${bookingIdEscaped}`, {
+          method: "DELETE"
+        }).catch(() => {});
+
+        await supabaseRest(`payments?booking_id=eq.${bookingIdEscaped}`, {
+          method: "DELETE"
+        }).catch(() => {});
+      }
+
+      // Delete the bookings themselves
+      await supabaseRest(`bookings?room_id=eq.${roomIdEscaped}`, {
+        method: "DELETE"
+      });
+    }
+
+    // 2. Delete room-specific offers
+    await supabaseRest(`offers?room_id=eq.${roomIdEscaped}`, {
+      method: "DELETE"
+    }).catch(() => {});
+
+    // 3. Delete room images
+    await supabaseRest(`room_images?room_id=eq.${roomIdEscaped}`, {
+      method: "DELETE"
+    }).catch(() => {});
+
+    // 4. Delete the room itself
+    await supabaseRest(`rooms?id=eq.${roomIdEscaped}`, {
       method: "DELETE"
     });
 

@@ -10,6 +10,7 @@ type BookingCheckoutProps = {
   roomId: string;
   roomPrice: number;
   roomCapacity: number;
+  roomName?: string;
 };
 
 // Country codes — Africa-first, then global
@@ -90,7 +91,8 @@ export function BookingCheckout({
   hotelSlug,
   roomId,
   roomPrice,
-  roomCapacity
+  roomCapacity,
+  roomName
 }: BookingCheckoutProps) {
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
@@ -125,14 +127,33 @@ export function BookingCheckout({
       c.code.includes(dialSearch)
     ), [dialSearch]);
 
+  const isSingleRoom = useMemo(() => {
+    return (
+      roomCapacity === 1 ||
+      (roomName && roomName.toLowerCase().includes("single"))
+    );
+  }, [roomCapacity, roomName]);
+
+  const parsedCapacity = useMemo(() => {
+    return isSingleRoom ? 1 : roomCapacity;
+  }, [isSingleRoom, roomCapacity]);
+
+  // Sync guestCount when parsedCapacity/isSingleRoom changes
+  useEffect(() => {
+    if (isSingleRoom) {
+      setGuestCount("1");
+    }
+  }, [isSingleRoom]);
+
+  const guestOptions = useMemo(
+    () => Array.from({ length: parsedCapacity }, (_, index) => index + 1),
+    [parsedCapacity]
+  );
+
   const nights = nightsBetween(checkIn, checkOut) || 1;
   const subtotal = roomPrice * nights;
   const taxes = Math.round(subtotal * 0.15);
   const total = subtotal + taxes;
-  const guestOptions = useMemo(
-    () => Array.from({ length: roomCapacity }, (_, index) => index + 1),
-    [roomCapacity]
-  );
 
 
 
@@ -185,96 +206,112 @@ export function BookingCheckout({
 
   return (
     <form className="mt-6 grid gap-4" onSubmit={submitBooking}>
-      <div className="grid gap-2">
-        <label className="text-sm font-semibold text-stone-800">Check-in</label>
-        <input
-          type="date"
-          required
-          min={new Date().toISOString().split("T")[0]}
-          value={checkIn}
-          onChange={(event) => setCheckIn(event.target.value)}
-          className="rounded-md border border-stone-300 px-3 py-3"
-        />
+      <div className="grid grid-cols-2 gap-3.5">
+        <div className="grid gap-1.5">
+          <label className="text-xs font-bold text-stone-500 uppercase tracking-wider">Check-in</label>
+          <input
+            type="date"
+            required
+            min={new Date().toISOString().split("T")[0]}
+            value={checkIn}
+            onChange={(event) => setCheckIn(event.target.value)}
+            className="w-full rounded-xl border border-stone-250 bg-stone-50/50 px-3.5 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 outline-none transition-all duration-200"
+          />
+        </div>
+        <div className="grid gap-1.5">
+          <label className="text-xs font-bold text-stone-500 uppercase tracking-wider">Check-out</label>
+          <input
+            type="date"
+            required
+            min={checkIn || new Date().toISOString().split("T")[0]}
+            value={checkOut}
+            onChange={(event) => setCheckOut(event.target.value)}
+            className="w-full rounded-xl border border-stone-250 bg-stone-50/50 px-3.5 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 outline-none transition-all duration-200"
+          />
+        </div>
       </div>
-      <div className="grid gap-2">
-        <label className="text-sm font-semibold text-stone-800">Check-out</label>
-        <input
-          type="date"
-          required
-          min={checkIn || new Date().toISOString().split("T")[0]}
-          value={checkOut}
-          onChange={(event) => setCheckOut(event.target.value)}
-          className="rounded-md border border-stone-300 px-3 py-3"
-        />
-      </div>
-      <div className="grid gap-2">
-        <label className="text-sm font-semibold text-stone-800">Guests</label>
-        <select
-          value={guestCount}
-          onChange={(event) => setGuestCount(event.target.value)}
-          className="rounded-md border border-stone-300 px-3 py-3"
-        >
-          {guestOptions.map((count) => (
-            <option key={count} value={count}>
-              {count} {count === 1 ? "Guest" : "Guests"}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="grid gap-2">
-        <label className="text-sm font-semibold text-stone-800">Full name</label>
+
+      {isSingleRoom ? (
+        <div className="grid gap-1.5 bg-stone-100/60 rounded-xl border border-stone-200/50 p-3.5">
+          <label className="text-xs font-bold text-stone-500 uppercase tracking-wider">Guests</label>
+          <div className="flex items-center gap-2 text-stone-700 font-bold text-sm">
+            <span>👤 1 Guest</span>
+            <span className="text-xs font-normal text-stone-500">(Single occupancy room)</span>
+          </div>
+        </div>
+      ) : (
+        <div className="grid gap-1.5">
+          <label className="text-xs font-bold text-stone-500 uppercase tracking-wider">Guests</label>
+          <select
+            value={guestCount}
+            onChange={(event) => setGuestCount(event.target.value)}
+            className="w-full rounded-xl border border-stone-250 bg-stone-50/50 px-3.5 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 outline-none transition-all duration-200 cursor-pointer"
+          >
+            {guestOptions.map((count) => (
+              <option key={count} value={count}>
+                {count} {count === 1 ? "Guest" : "Guests"}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      <div className="grid gap-1.5">
+        <label className="text-xs font-bold text-stone-500 uppercase tracking-wider">Full name</label>
         <input
           required
           value={fullName}
           onChange={(event) => setFullName(event.target.value)}
-          className="rounded-md border border-stone-300 px-3 py-3"
+          className="w-full rounded-xl border border-stone-250 bg-stone-50/50 px-3.5 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 outline-none transition-all duration-200"
           placeholder="Your full name"
         />
       </div>
-      <div className="grid gap-2">
-        <label className="text-sm font-semibold text-stone-800">Email</label>
+
+      <div className="grid gap-1.5">
+        <label className="text-xs font-bold text-stone-500 uppercase tracking-wider">Email</label>
         <input
           required
           type="email"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
-          className="rounded-md border border-stone-300 px-3 py-3"
+          className="w-full rounded-xl border border-stone-250 bg-stone-50/50 px-3.5 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 outline-none transition-all duration-200"
           placeholder="you@example.com"
         />
       </div>
-      <div className="grid gap-2">
-        <label className="text-sm font-semibold text-stone-800">Phone</label>
+
+      <div className="grid gap-1.5">
+        <label className="text-xs font-bold text-stone-500 uppercase tracking-wider">Phone</label>
         <div ref={dialRef} className="relative flex gap-2">
           {/* Country code button */}
           <button
             type="button"
             id="country-code-selector"
             onClick={() => { setDialOpen(v => !v); setDialSearch(""); }}
-            className="flex items-center gap-1.5 rounded-md border border-stone-300 bg-white px-3 py-3 text-sm font-medium text-stone-700 hover:bg-stone-50 transition shrink-0"
+            className="flex items-center gap-1.5 rounded-xl border border-stone-250 bg-white px-3.5 py-3 text-sm font-semibold text-stone-700 hover:bg-stone-50 transition shrink-0 focus:ring-2 focus:ring-emerald-500/20 outline-none"
           >
             <span className="text-base leading-none">{phoneDialCode.flag}</span>
-            <span className="font-semibold">{phoneDialCode.code}</span>
+            <span>{phoneDialCode.code}</span>
             <ChevronDown size={14} className={`transition-transform text-stone-400 ${dialOpen ? "rotate-180" : ""}`} />
           </button>
 
           {/* Dropdown */}
           {dialOpen && (
-            <div className="absolute left-0 top-full z-50 mt-1 w-72 rounded-xl border border-stone-200 bg-white shadow-2xl overflow-hidden">
+            <div className="absolute left-0 top-full z-50 mt-1.5 w-72 rounded-xl border border-stone-200 bg-white shadow-2xl overflow-hidden">
               {/* Search */}
-              <div className="flex items-center gap-2 border-b border-stone-100 px-3 py-2">
+              <div className="flex items-center gap-2 border-b border-stone-100 px-3.5 py-2.5">
                 <Search size={14} className="text-stone-400 shrink-0" />
                 <input
                   autoFocus
                   value={dialSearch}
                   onChange={e => setDialSearch(e.target.value)}
                   placeholder="Search country or code…"
-                  className="w-full text-sm outline-none text-stone-700 placeholder:text-stone-400"
+                  className="w-full text-sm outline-none text-stone-750 placeholder:text-stone-400 bg-transparent"
                 />
               </div>
               {/* List */}
-              <ul className="max-h-56 overflow-y-auto">
+              <ul className="max-h-52 overflow-y-auto">
                 {filteredCodes.length === 0 && (
-                  <li className="px-4 py-3 text-sm text-stone-400">No results</li>
+                  <li className="px-4 py-3.5 text-sm text-stone-400">No results</li>
                 )}
                 {filteredCodes.map(c => (
                   <li key={c.code + c.country}>
@@ -287,7 +324,7 @@ export function BookingCheckout({
                       }}
                       className={`flex w-full items-center gap-3 px-4 py-2.5 text-sm hover:bg-emerald-50 transition text-left ${
                         c.code === phoneDialCode.code && c.country === phoneDialCode.country
-                          ? "bg-emerald-50 font-semibold text-emerald-700"
+                          ? "bg-emerald-50 font-bold text-emerald-700"
                           : "text-stone-700"
                       }`}
                     >
@@ -308,54 +345,62 @@ export function BookingCheckout({
             value={phoneNumber}
             onChange={e => setPhoneNumber(e.target.value.replace(/[^0-9]/g, ""))}
             placeholder="780 000 000"
-            className="flex-1 rounded-md border border-stone-300 px-3 py-3 text-sm tracking-wide"
+            className="flex-1 rounded-xl border border-stone-250 bg-stone-50/50 px-3.5 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 outline-none transition-all duration-200 tracking-wide"
           />
         </div>
-        <p className="text-xs text-stone-400">
+        <p className="text-[11px] text-stone-400 leading-normal pl-0.5">
           {phoneDialCode.flag} {phoneDialCode.country} · Full number: {phoneDialCode.code}{phoneNumber.replace(/^0+/, "") || "…"}
         </p>
       </div>
-      <div className="rounded-lg bg-stone-100 p-4 text-sm text-stone-700">
+
+      <div className="rounded-xl bg-stone-100/80 border border-stone-200/40 p-4 text-sm text-stone-700">
         <div className="flex justify-between">
-          <span>
+          <span className="text-stone-500">
             {formatCurrency(roomPrice)} x {nights} {nights === 1 ? "night" : "nights"}
           </span>
-          <span>{formatCurrency(subtotal)}</span>
+          <span className="font-semibold text-stone-900">{formatCurrency(subtotal)}</span>
         </div>
-        <div className="mt-2 flex justify-between">
-          <span>Taxes</span>
-          <span>{formatCurrency(taxes)}</span>
+        <div className="mt-2.5 flex justify-between">
+          <span className="text-stone-500">Taxes (15%)</span>
+          <span className="font-semibold text-stone-900">{formatCurrency(taxes)}</span>
         </div>
-        <div className="mt-3 flex justify-between border-t border-stone-300 pt-3 text-base font-bold text-stone-950">
+        <div className="mt-3.5 flex justify-between border-t border-stone-250 pt-3 text-base font-bold text-stone-950">
           <span>Total</span>
-          <span>{formatCurrency(total)}</span>
+          <span className="text-emerald-850 font-bold">{formatCurrency(total)}</span>
         </div>
       </div>
-      <div className="flex items-start gap-2 py-2">
+
+      <div className="flex items-start gap-2.5 py-1.5">
         <input
           type="checkbox"
           id="agreeToTerms"
           required
           checked={agreeToTerms}
           onChange={(event) => setAgreeToTerms(event.target.checked)}
-          className="mt-1 h-4 w-4 rounded border-stone-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+          className="mt-0.5 h-4.5 w-4.5 rounded border-stone-300 text-emerald-600 focus:ring-emerald-500/25 cursor-pointer accent-emerald-650"
         />
-        <label htmlFor="agreeToTerms" className="text-xs text-stone-600 leading-normal cursor-pointer select-none">
+        <label htmlFor="agreeToTerms" className="text-xs text-stone-500 leading-relaxed cursor-pointer select-none">
           I have read and agree to the{" "}
           <button
             type="button"
             onClick={() => setShowTermsModal(true)}
-            className="text-emerald-750 font-semibold underline hover:text-emerald-800 focus:outline-none"
+            className="text-emerald-700 font-bold underline hover:text-emerald-800 focus:outline-none"
           >
             Refund & Cancellation Policy
           </button>
           .
         </label>
       </div>
-      {error ? <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
+
+      {error && (
+        <p className="rounded-xl bg-red-50/80 border border-red-100 px-3.5 py-2.5 text-xs font-semibold text-red-700 leading-relaxed">
+          ⚠️ {error}
+        </p>
+      )}
+
       <button
         disabled={loading}
-        className="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-700 px-4 py-3 font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-stone-400"
+        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-3.5 font-bold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500 transition-all shadow-md shadow-emerald-700/10 cursor-pointer"
       >
         <CreditCard size={18} />
         {loading ? "Starting payment..." : "Pay with DPO"}
