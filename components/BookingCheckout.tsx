@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import Link from "next/link";
-import { CreditCard } from "lucide-react";
+import { CreditCard, ChevronDown, Search } from "lucide-react";
 import { formatCurrency } from "@/lib/data";
 
 type BookingCheckoutProps = {
@@ -11,6 +11,73 @@ type BookingCheckoutProps = {
   roomPrice: number;
   roomCapacity: number;
 };
+
+// Country codes — Africa-first, then global
+const COUNTRY_CODES = [
+  { code: "+250", country: "Rwanda", flag: "🇷🇼" },
+  { code: "+254", country: "Kenya", flag: "🇰🇪" },
+  { code: "+255", country: "Tanzania", flag: "🇹🇿" },
+  { code: "+256", country: "Uganda", flag: "🇺🇬" },
+  { code: "+243", country: "DR Congo", flag: "🇨🇩" },
+  { code: "+257", country: "Burundi", flag: "🇧🇮" },
+  { code: "+251", country: "Ethiopia", flag: "🇪🇹" },
+  { code: "+27", country: "South Africa", flag: "🇿🇦" },
+  { code: "+234", country: "Nigeria", flag: "🇳🇬" },
+  { code: "+233", country: "Ghana", flag: "🇬🇭" },
+  { code: "+212", country: "Morocco", flag: "🇲🇦" },
+  { code: "+20", country: "Egypt", flag: "🇪🇬" },
+  { code: "+225", country: "Côte d'Ivoire", flag: "🇨🇮" },
+  { code: "+221", country: "Senegal", flag: "🇸🇳" },
+  { code: "+237", country: "Cameroon", flag: "🇨🇲" },
+  { code: "+260", country: "Zambia", flag: "🇿🇲" },
+  { code: "+263", country: "Zimbabwe", flag: "🇿🇼" },
+  { code: "+258", country: "Mozambique", flag: "🇲🇿" },
+  { code: "+249", country: "Sudan", flag: "🇸🇩" },
+  { code: "+252", country: "Somalia", flag: "🇸🇴" },
+  { code: "+241", country: "Gabon", flag: "🇬🇦" },
+  { code: "+267", country: "Botswana", flag: "🇧🇼" },
+  { code: "+266", country: "Lesotho", flag: "🇱🇸" },
+  { code: "+268", country: "Eswatini", flag: "🇸🇿" },
+  { code: "+1", country: "United States", flag: "🇺🇸" },
+  { code: "+44", country: "United Kingdom", flag: "🇬🇧" },
+  { code: "+33", country: "France", flag: "🇫🇷" },
+  { code: "+49", country: "Germany", flag: "🇩🇪" },
+  { code: "+39", country: "Italy", flag: "🇮🇹" },
+  { code: "+34", country: "Spain", flag: "🇪🇸" },
+  { code: "+31", country: "Netherlands", flag: "🇳🇱" },
+  { code: "+32", country: "Belgium", flag: "🇧🇪" },
+  { code: "+41", country: "Switzerland", flag: "🇨🇭" },
+  { code: "+46", country: "Sweden", flag: "🇸🇪" },
+  { code: "+47", country: "Norway", flag: "🇳🇴" },
+  { code: "+45", country: "Denmark", flag: "🇩🇰" },
+  { code: "+61", country: "Australia", flag: "🇦🇺" },
+  { code: "+64", country: "New Zealand", flag: "🇳🇿" },
+  { code: "+81", country: "Japan", flag: "🇯🇵" },
+  { code: "+82", country: "South Korea", flag: "🇰🇷" },
+  { code: "+86", country: "China", flag: "🇨🇳" },
+  { code: "+91", country: "India", flag: "🇮🇳" },
+  { code: "+971", country: "UAE", flag: "🇦🇪" },
+  { code: "+966", country: "Saudi Arabia", flag: "🇸🇦" },
+  { code: "+974", country: "Qatar", flag: "🇶🇦" },
+  { code: "+965", country: "Kuwait", flag: "🇰🇼" },
+  { code: "+55", country: "Brazil", flag: "🇧🇷" },
+  { code: "+52", country: "Mexico", flag: "🇲🇽" },
+  { code: "+54", country: "Argentina", flag: "🇦🇷" },
+  { code: "+56", country: "Chile", flag: "🇨🇱" },
+  { code: "+57", country: "Colombia", flag: "🇨🇴" },
+  { code: "+7", country: "Russia", flag: "🇷🇺" },
+  { code: "+380", country: "Ukraine", flag: "🇺🇦" },
+  { code: "+48", country: "Poland", flag: "🇵🇱" },
+  { code: "+90", country: "Turkey", flag: "🇹🇷" },
+  { code: "+62", country: "Indonesia", flag: "🇮🇩" },
+  { code: "+63", country: "Philippines", flag: "🇵🇭" },
+  { code: "+60", country: "Malaysia", flag: "🇲🇾" },
+  { code: "+65", country: "Singapore", flag: "🇸🇬" },
+  { code: "+66", country: "Thailand", flag: "🇹🇭" },
+  { code: "+84", country: "Vietnam", flag: "🇻🇳" },
+  { code: "+92", country: "Pakistan", flag: "🇵🇰" },
+  { code: "+880", country: "Bangladesh", flag: "🇧🇩" },
+];
 
 function nightsBetween(checkIn: string, checkOut: string) {
   if (!checkIn || !checkOut) return 0;
@@ -30,11 +97,34 @@ export function BookingCheckout({
   const [guestCount, setGuestCount] = useState("1");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
+  const [phoneDialCode, setPhoneDialCode] = useState(COUNTRY_CODES[0]);
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [dialOpen, setDialOpen] = useState(false);
+  const [dialSearch, setDialSearch] = useState("");
+  const dialRef = useRef<HTMLDivElement>(null);
   const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dialRef.current && !dialRef.current.contains(e.target as Node)) {
+        setDialOpen(false);
+        setDialSearch("");
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredCodes = useMemo(() =>
+    COUNTRY_CODES.filter(c =>
+      c.country.toLowerCase().includes(dialSearch.toLowerCase()) ||
+      c.code.includes(dialSearch)
+    ), [dialSearch]);
+
   const nights = nightsBetween(checkIn, checkOut) || 1;
   const subtotal = roomPrice * nights;
   const taxes = Math.round(subtotal * 0.15);
@@ -43,6 +133,8 @@ export function BookingCheckout({
     () => Array.from({ length: roomCapacity }, (_, index) => index + 1),
     [roomCapacity]
   );
+
+
 
   async function submitBooking(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -66,7 +158,7 @@ export function BookingCheckout({
           guest_count: guestCount,
           guest_full_name: fullName,
           guest_email: email,
-          guest_phone: phone
+          guest_phone: `${phoneDialCode.code}${phoneNumber.replace(/^0+/, "")}`
         })
       });
 
@@ -152,13 +244,76 @@ export function BookingCheckout({
       </div>
       <div className="grid gap-2">
         <label className="text-sm font-semibold text-stone-800">Phone</label>
-        <input
-          required
-          value={phone}
-          onChange={(event) => setPhone(event.target.value)}
-          className="rounded-md border border-stone-300 px-3 py-3"
-          placeholder="+27..."
-        />
+        <div ref={dialRef} className="relative flex gap-2">
+          {/* Country code button */}
+          <button
+            type="button"
+            id="country-code-selector"
+            onClick={() => { setDialOpen(v => !v); setDialSearch(""); }}
+            className="flex items-center gap-1.5 rounded-md border border-stone-300 bg-white px-3 py-3 text-sm font-medium text-stone-700 hover:bg-stone-50 transition shrink-0"
+          >
+            <span className="text-base leading-none">{phoneDialCode.flag}</span>
+            <span className="font-semibold">{phoneDialCode.code}</span>
+            <ChevronDown size={14} className={`transition-transform text-stone-400 ${dialOpen ? "rotate-180" : ""}`} />
+          </button>
+
+          {/* Dropdown */}
+          {dialOpen && (
+            <div className="absolute left-0 top-full z-50 mt-1 w-72 rounded-xl border border-stone-200 bg-white shadow-2xl overflow-hidden">
+              {/* Search */}
+              <div className="flex items-center gap-2 border-b border-stone-100 px-3 py-2">
+                <Search size={14} className="text-stone-400 shrink-0" />
+                <input
+                  autoFocus
+                  value={dialSearch}
+                  onChange={e => setDialSearch(e.target.value)}
+                  placeholder="Search country or code…"
+                  className="w-full text-sm outline-none text-stone-700 placeholder:text-stone-400"
+                />
+              </div>
+              {/* List */}
+              <ul className="max-h-56 overflow-y-auto">
+                {filteredCodes.length === 0 && (
+                  <li className="px-4 py-3 text-sm text-stone-400">No results</li>
+                )}
+                {filteredCodes.map(c => (
+                  <li key={c.code + c.country}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPhoneDialCode(c);
+                        setDialOpen(false);
+                        setDialSearch("");
+                      }}
+                      className={`flex w-full items-center gap-3 px-4 py-2.5 text-sm hover:bg-emerald-50 transition text-left ${
+                        c.code === phoneDialCode.code && c.country === phoneDialCode.country
+                          ? "bg-emerald-50 font-semibold text-emerald-700"
+                          : "text-stone-700"
+                      }`}
+                    >
+                      <span className="text-base">{c.flag}</span>
+                      <span className="flex-1">{c.country}</span>
+                      <span className="text-stone-400 font-mono text-xs">{c.code}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Number input */}
+          <input
+            required
+            type="tel"
+            value={phoneNumber}
+            onChange={e => setPhoneNumber(e.target.value.replace(/[^0-9]/g, ""))}
+            placeholder="780 000 000"
+            className="flex-1 rounded-md border border-stone-300 px-3 py-3 text-sm tracking-wide"
+          />
+        </div>
+        <p className="text-xs text-stone-400">
+          {phoneDialCode.flag} {phoneDialCode.country} · Full number: {phoneDialCode.code}{phoneNumber.replace(/^0+/, "") || "…"}
+        </p>
       </div>
       <div className="rounded-lg bg-stone-100 p-4 text-sm text-stone-700">
         <div className="flex justify-between">
@@ -203,7 +358,7 @@ export function BookingCheckout({
         className="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-700 px-4 py-3 font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-stone-400"
       >
         <CreditCard size={18} />
-        {loading ? "Starting payment..." : "Pay with Pesapal"}
+        {loading ? "Starting payment..." : "Pay with DPO"}
       </button>
 
       {/* Refund & Cancellation Policy Modal */}

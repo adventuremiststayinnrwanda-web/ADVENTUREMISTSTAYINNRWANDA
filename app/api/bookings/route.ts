@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "node:crypto";
-import { getDbHotel, getDbRoom } from "@/lib/server/db";
-import { submitPesapalOrder } from "@/lib/server/pesapal";
+import { getDbHotel } from "@/lib/server/db";
+import { submitDpoOrder } from "@/lib/server/dpo";
 import { supabaseRest } from "@/lib/server/supabaseRest";
 
 function bookingReference() {
@@ -16,27 +16,14 @@ function daysBetween(checkIn: string, checkOut: string) {
 
 function publicBaseUrl(request: NextRequest) {
   return (
+    process.env.DPO_PUBLIC_BASE_URL ||
     process.env.PESAPAL_PUBLIC_BASE_URL ||
     process.env.NEXT_PUBLIC_APP_URL ||
     request.nextUrl.origin
   ).replace(/\/$/, "");
 }
 
-function extractPesapalErrorMessage(pesapalOrder: any): string | null {
-  if (!pesapalOrder) return null;
-  if (typeof pesapalOrder.error === "string") return pesapalOrder.error;
-  if (pesapalOrder.error && typeof pesapalOrder.error.message === "string") {
-    return pesapalOrder.error.message;
-  }
-  if (pesapalOrder.error && typeof pesapalOrder.error.code === "string") {
-    return `Pesapal error: ${pesapalOrder.error.code}`;
-  }
-  if (typeof pesapalOrder.message === "string") return pesapalOrder.message;
-  if (typeof pesapalOrder.status === "string" && pesapalOrder.status !== "200") {
-    return `Pesapal status ${pesapalOrder.status}`;
-  }
-  return null;
-}
+
 
 export async function POST(request: NextRequest) {
   try {
@@ -44,12 +31,27 @@ export async function POST(request: NextRequest) {
 
     // Load hotel and room dynamically from Supabase
     const hotel = await getDbHotel(body.hotel_slug);
-    const room = hotel ? hotel.rooms.find((r) => r.id === body.room_id) || null : null;
-    const nights = daysBetween(body.check_in_date, body.check_out_date);
-    const guestCount = Number(body.guest_count);
+    if (!hotel) {
+      console.error("Booking failed: hotel not found for slug:", body.hotel_slug);
+      return NextResponse.json({ error: `Invalid booking details: Hotel not found (${body.hotel_slug}).` }, { status: 400 });
+    }
 
-    if (!hotel || !room || nights <= 0 || guestCount < 1 || guestCount > room.capacity) {
-      return NextResponse.json({ error: "Invalid booking details." }, { status: 400 });
+    const room = hotel.rooms.find((r) => r.id === body.room_id) || null;
+    if (!room) {
+      console.error("Booking failed: room not found for ID:", body.room_id, "in hotel:", hotel.name);
+      return NextResponse.json({ error: `Invalid booking details: Room not found.` }, { status: 400 });
+    }
+
+    const nights = daysBetween(body.check_in_date, body.check_out_date);
+    if (nights <= 0) {
+      console.error("Booking failed: invalid dates. checkIn:", body.check_in_date, "checkOut:", body.check_out_date);
+      return NextResponse.json({ error: `Invalid booking details: Stay duration must be at least 1 night.` }, { status: 400 });
+    }
+
+    const guestCount = Number(body.guest_count);
+    if (guestCount < 1 || guestCount > room.capacity) {
+      console.error("Booking failed: invalid guest count:", guestCount, "room capacity:", room.capacity);
+      return NextResponse.json({ error: `Invalid booking details: Guest count must be between 1 and ${room.capacity}.` }, { status: 400 });
     }
 
     if (!body.guest_full_name || !body.guest_email || !body.guest_phone) {
@@ -86,14 +88,13 @@ export async function POST(request: NextRequest) {
     );
 
     const origin = publicBaseUrl(request);
-    const currency = process.env.PESAPAL_CURRENCY || "USD";
-    const pesapalOrder = await submitPesapalOrder({
+    const currency = process.env.DPO_CURRENCY || "USD";
+    const dpoOrder = await submitDpoOrder({
       reference,
       amount: total,
       currency,
       description: `${hotel.name} - ${room.name}`,
-      callbackUrl: `${origin}/api/pesapal/callback`,
-      cancellationUrl: `${origin}/hotels/${hotel.slug}/rooms/${room.id}`,
+      callbackUrl: `${origin}/api/dpo/callback`,
       customer: {
         email: body.guest_email,
         phone: body.guest_phone,
@@ -101,22 +102,21 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    const isValidPesapalOrder =
-      pesapalOrder &&
-      typeof pesapalOrder.order_tracking_id === "string" &&
-      pesapalOrder.order_tracking_id.trim().length > 0 &&
-      !(pesapalOrder as { error?: unknown }).error;
+    const isValidDpoOrder =
+      dpoOrder &&
+      typeof dpoOrder.transToken === "string" &&
+      dpoOrder.transToken.trim().length > 0 &&
+      !dpoOrder.error;
 
-    if (!isValidPesapalOrder) {
-      console.error("Pesapal submit order failed:", pesapalOrder);
+    if (!isValidDpoOrder) {
+      console.error("DPO submit order failed:", dpoOrder);
 
-      const pesapalErrorMessage = extractPesapalErrorMessage(pesapalOrder);
-      const exposeDetails = (process.env.PESAPAL_MODE || "sandbox") !== "live";
+      const exposeDetails = (process.env.DPO_MODE || "sandbox") !== "live";
 
       return NextResponse.json(
         {
-          error: pesapalErrorMessage || "Payment gateway error",
-          details: exposeDetails ? pesapalOrder || null : undefined
+          error: dpoOrder.error || "DPO payment gateway error",
+          details: exposeDetails ? dpoOrder || null : undefined
         },
         { status: 400 }
       );
@@ -126,18 +126,18 @@ export async function POST(request: NextRequest) {
       method: "POST",
       body: JSON.stringify({
         booking_id: bookingRows[0].id,
-        gateway: "pesapal",
-        gateway_reference: pesapalOrder.order_tracking_id,
+        gateway: "dpo",
+        gateway_reference: dpoOrder.transToken,
         amount: total,
         currency,
         status: "pending",
-        raw_payload: pesapalOrder
+        raw_payload: dpoOrder
       })
     });
 
     return NextResponse.json({
       booking_reference: reference,
-      redirect_url: pesapalOrder.redirect_url
+      redirect_url: dpoOrder.redirectUrl
     });
   } catch (error) {
     return NextResponse.json(

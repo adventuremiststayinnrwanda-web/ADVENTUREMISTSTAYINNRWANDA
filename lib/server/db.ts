@@ -126,13 +126,8 @@ export const getDbHotels = cache(async function getDbHotels(): Promise<Hotel[]> 
       } as Hotel;
     });
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    if (msg.includes("ENOTFOUND") || msg.includes("fetch failed") || msg.includes("Connect Timeout")) {
-      console.warn("Supabase URL is unreachable. Using static local hotels data fallback.");
-    } else {
-      console.error("Error fetching data from Supabase:", error);
-    }
-    return staticHotels;
+    console.error("Database fetch error in getDbHotels:", error);
+    throw error;
   }
 });
 

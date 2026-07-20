@@ -1,0 +1,7 @@
+DPO_MODE            = sandbox
+DPO_COMPANY_TOKEN   = B3F59BE7-0756-420E-BB88-1D98E7A6B040
+DPO_SERVICE_TYPE    = 85325
+DPO_ENDPOINT        = https://secure.3gdirectpay.com/API/v6/
+DPO_PAYMENT_URL     = https://secure.3gdirectpay.com/payv3.php?ID=
+DPO_PUBLIC_BASE_URL = https://adventuremiststayinnrwanda.vercel.app
+DPO_CURRENCY        = USD

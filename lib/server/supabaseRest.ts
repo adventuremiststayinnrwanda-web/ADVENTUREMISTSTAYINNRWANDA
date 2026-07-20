@@ -7,6 +7,10 @@
  * continue to work without changes.
  */
 
+// Offset Date.now by 5 minutes to absorb any clock skew with Supabase servers
+const _originalNow = Date.now;
+Date.now = () => _originalNow() - 300000;
+
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -33,6 +37,21 @@ export function getSupabaseAdmin(): SupabaseClient {
 
   return _adminClient;
 }
+
+/** Reset the singleton so the next call gets a fresh client with a new JWT. */
+function resetSupabaseAdmin() {
+  _adminClient = null;
+}
+
+/** Returns true if the Supabase error is a JWT clock-skew error (PGRST303). */
+function isClockSkewError(error: any): boolean {
+  return (
+    error?.code === "PGRST303" ||
+    (typeof error?.message === "string" &&
+      error.message.toLowerCase().includes("jwt issued at future"))
+  );
+}
+
 
 // ---------------------------------------------------------------------------
 // Path parser helpers
