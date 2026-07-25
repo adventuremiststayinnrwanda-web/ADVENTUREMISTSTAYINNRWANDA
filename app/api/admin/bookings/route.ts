@@ -1,6 +1,9 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/server/adminAuth";
 import { supabaseRest } from "@/lib/server/supabaseRest";
+
+export async function GET() { return new Response(null, { status: 405 }); }
 
 export async function PATCH(request: NextRequest) {
   try {

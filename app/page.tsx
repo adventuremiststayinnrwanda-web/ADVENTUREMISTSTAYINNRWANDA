@@ -1,11 +1,12 @@
 export const dynamic = 'force-dynamic';
 import Image from "next/image";
 import Link from "next/link";
-import { CalendarDays, MapPin, Search, Star, Users, Banknote } from "lucide-react";
+import { CalendarDays, MapPin, Search, Star, Users, Banknote, Compass, Briefcase, Heart, Palmtree, ShieldCheck, CheckCircle2 } from "lucide-react";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { HotelCard } from "@/components/HotelCard";
 import { RoomCard } from "@/components/RoomCard";
+import { Partnerships } from "@/components/Partnerships";
 import { getDbHotels, getDbReviews, getDbPartnerships } from "@/lib/server/db";
 
 export default async function Home() {
@@ -36,13 +37,13 @@ export default async function Home() {
           <div className="relative mx-auto flex min-h-[500px] sm:min-h-[680px] max-w-7xl flex-col justify-center px-4 py-12 sm:py-16 sm:px-6 lg:px-8">
             <div className="max-w-3xl drop-shadow-lg">
               <p className="text-xs sm:text-sm font-semibold uppercase tracking-[0.25em] text-emerald-300">
-                GUEST-FIRST HOTEL BOOKING IN RWANDA
+                YOUR TRUSTED TRAVEL & HOTEL BOOKING PARTNER IN RWANDA
               </p>
               <h1 className="mt-4 max-w-2xl text-3xl sm:text-5xl lg:text-6xl font-extrabold leading-tight drop-shadow-md">
-                Find Your <span className="shining-text">Perfect Hotel Stay</span>
+                Find & Book Your <span className="shining-text">Perfect Hotel Stay</span>
               </h1>
-              <p className="mt-4 sm:mt-5 max-w-xl text-sm sm:text-lg leading-7 sm:leading-8 text-stone-200 drop-shadow">
-                Search, book, pay, and receive your QR check-in pass instantly without needing to create an account first.
+              <p className="mt-4 sm:mt-5 max-w-2xl text-sm sm:text-lg leading-7 sm:leading-8 text-stone-200 drop-shadow">
+                Adventure Mist Stay Inn Rwanda is your trusted travel and hotel booking partner in Rwanda. Whether you&apos;re planning a vacation, business trip, honeymoon, or family getaway, we help you discover and book the perfect hotel with ease.
               </p>
             </div>
             <form action="/hotels" className="mt-10 grid gap-3 rounded-2xl p-4 text-stone-950 glass-panel grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-[1.5fr_1fr_1fr_1fr_1fr_auto]">
@@ -85,6 +86,53 @@ export default async function Home() {
                 <span className="hidden sm:inline">Search</span>
               </button>
             </form>
+          </div>
+        </section>
+
+        {/* What We Do Section */}
+        <section className="bg-emerald-950 text-stone-100 py-12 border-b border-emerald-900/50">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="text-center max-w-3xl mx-auto">
+              <span className="text-xs font-semibold uppercase tracking-widest text-emerald-400">WHAT WE DO</span>
+              <h2 className="mt-2 text-2xl sm:text-4xl font-extrabold text-white">Your Ultimate Hotel & Travel Partner</h2>
+              <p className="mt-4 text-base sm:text-lg text-emerald-100/90 leading-relaxed">
+                Compare accommodations, secure the best rates, and enjoy a smooth booking experience from start to finish—all in one place.
+              </p>
+            </div>
+            
+            <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="rounded-xl bg-emerald-900/40 border border-emerald-800/60 p-6 flex flex-col items-center text-center">
+                <div className="p-3 rounded-full bg-emerald-800/80 text-emerald-300 mb-4">
+                  <Palmtree size={28} />
+                </div>
+                <h3 className="font-bold text-lg text-white">Vacations</h3>
+                <p className="mt-2 text-sm text-stone-300">Discover incredible Rwanda getaways, volcano lodges, and lakeside resorts.</p>
+              </div>
+
+              <div className="rounded-xl bg-emerald-900/40 border border-emerald-800/60 p-6 flex flex-col items-center text-center">
+                <div className="p-3 rounded-full bg-emerald-800/80 text-emerald-300 mb-4">
+                  <Briefcase size={28} />
+                </div>
+                <h3 className="font-bold text-lg text-white">Business Trips</h3>
+                <p className="mt-2 text-sm text-stone-300">Seamless bookings with fast check-in for corporate and business travelers.</p>
+              </div>
+
+              <div className="rounded-xl bg-emerald-900/40 border border-emerald-800/60 p-6 flex flex-col items-center text-center">
+                <div className="p-3 rounded-full bg-emerald-800/80 text-emerald-300 mb-4">
+                  <Heart size={28} />
+                </div>
+                <h3 className="font-bold text-lg text-white">Honeymoons</h3>
+                <p className="mt-2 text-sm text-stone-300">Romantic stays, serene views, and luxury accommodations for couples.</p>
+              </div>
+
+              <div className="rounded-xl bg-emerald-900/40 border border-emerald-800/60 p-6 flex flex-col items-center text-center">
+                <div className="p-3 rounded-full bg-emerald-800/80 text-emerald-300 mb-4">
+                  <Users size={28} />
+                </div>
+                <h3 className="font-bold text-lg text-white">Family Getaways</h3>
+                <p className="mt-2 text-sm text-stone-300">Spacious suites and family-friendly hotels tailored to all group sizes.</p>
+              </div>
+            </div>
           </div>
         </section>
         
@@ -142,22 +190,8 @@ export default async function Home() {
           </div>
         </section>
 
-        {partnerships.length > 0 && (
-          <section className="bg-stone-100 py-12 relative overflow-hidden border-t border-b border-stone-200/50">
-            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
-              <p className="font-bold text-stone-500 uppercase tracking-widest text-xs mb-8">Trusted by Governments & Companies</p>
-              <div className="flex flex-wrap justify-center items-center gap-10 opacity-75">
-                {partnerships.map((partner) => (
-                  <div key={partner.id} className="flex flex-col items-center gap-2 px-2">
-                    {partner.logo_url && (
-                      <img src={partner.logo_url} alt={partner.name} className="h-10 object-contain grayscale hover:grayscale-0 transition duration-350" />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
+        {/* Partnerships Section - Placed right below Customer Reviews */}
+        <Partnerships partners={partnerships} />
       </main>
       <Footer />
     </>

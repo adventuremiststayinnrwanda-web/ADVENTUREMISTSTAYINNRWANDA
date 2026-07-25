@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "node:crypto";
 import { getDbHotel } from "@/lib/server/db";
@@ -24,6 +25,8 @@ function publicBaseUrl(request: NextRequest) {
 }
 
 
+
+export async function GET() { return new Response(null, { status: 405 }); }
 
 export async function POST(request: NextRequest) {
   try {

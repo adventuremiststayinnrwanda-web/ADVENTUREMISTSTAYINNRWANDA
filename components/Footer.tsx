@@ -7,8 +7,7 @@ export function Footer() {
         <div>
           <h2 className="text-lg font-bold">Adventure Mist Stay Inn Rwanda</h2>
           <p className="mt-3 text-sm leading-6 text-stone-300">
-            Guest-first hotel bookings with fast payment, email confirmation, and QR
-            check-in.
+            Your trusted travel and hotel booking partner in Rwanda. Compare accommodations, secure the best rates, and enjoy a smooth booking experience from start to finish.
           </p>
         </div>
         <div>
@@ -30,10 +29,19 @@ export function Footer() {
         <div>
           <h3 className="font-semibold">Legal</h3>
           <div className="mt-3 grid gap-2 text-sm text-stone-300">
-            <Link href="/refund-policy">Refund & Cancellation Policy</Link>
+            <Link href="/refund-policy">Refund &amp; Cancellation Policy</Link>
             <span>Privacy Policy</span>
             <span>Secure Payments</span>
           </div>
+        </div>
+      </div>
+
+      <div className="border-t border-stone-800 bg-stone-950 py-5 text-center text-xs text-stone-400">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 sm:flex-row sm:px-6 lg:px-8">
+          <p>© {new Date().getFullYear()} Adventure Mist Stay Inn Rwanda. All rights reserved.</p>
+          <p className="flex items-center gap-1.5 font-medium text-stone-300">
+            Powered by <span className="font-bold tracking-wide text-emerald-400">P &amp; D Digital Solution</span>
+          </p>
         </div>
       </div>
     </footer>

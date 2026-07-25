@@ -14,6 +14,7 @@ import {
   Loader2,
   Lock,
   LogOut,
+  Mail,
   Pencil,
   Plus,
   Save,
@@ -1181,6 +1182,21 @@ export function AdminDashboard() {
     setSaving("");
   }
 
+  async function sendPaymentReminder(booking: BookingRow) {
+    setSaving(`reminder-${booking.id}`);
+    try {
+      const res = await apiFetch("/api/admin/send-reminder", {
+        method: "POST",
+        body: JSON.stringify({ bookingId: booking.id })
+      });
+      alert(res.message || `Payment reminder email sent successfully to ${booking.guest_email}!`);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to send payment reminder email.");
+    } finally {
+      setSaving("");
+    }
+  }
+
   async function updateReviewStatus(reviewId: string, status: string) {
     setSaving(reviewId);
     try {
@@ -1950,6 +1966,7 @@ export function AdminDashboard() {
                         <th className="px-6 py-3">Dates</th>
                         <th className="px-6 py-3">Amount</th>
                         <th className="px-6 py-3">Status</th>
+                        <th className="px-6 py-3 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-stone-100">
@@ -1980,11 +1997,26 @@ export function AdminDashboard() {
                               ))}
                             </select>
                           </td>
+                          <td className="px-6 py-4 text-right">
+                            <button
+                              onClick={() => sendPaymentReminder(booking)}
+                              disabled={saving === `reminder-${booking.id}`}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition shadow-sm"
+                              title="Send payment reminder email to guest"
+                            >
+                              {saving === `reminder-${booking.id}` ? (
+                                <Loader2 size={12} className="animate-spin" />
+                              ) : (
+                                <Mail size={12} />
+                              )}
+                              <span>{saving === `reminder-${booking.id}` ? "Sending..." : "Send Reminder"}</span>
+                            </button>
+                          </td>
                         </tr>
                       ))}
                       {filteredBookings.length === 0 && (
                         <tr>
-                          <td colSpan={5} className="px-6 py-12 text-center text-sm text-stone-400">
+                          <td colSpan={6} className="px-6 py-12 text-center text-sm text-stone-400">
                             No bookings match the selected filter.
                           </td>
                         </tr>

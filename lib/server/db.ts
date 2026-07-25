@@ -75,6 +75,7 @@ export const getDbHotels = cache(async function getDbHotels(): Promise<Hotel[]> 
         size: room.room_size || "28 sqm",
         status: room.status === "available" ? "Available" : room.status === "fully_booked" ? "Fully booked" : "Maintenance",
         image: primaryImage,
+        images: images.length > 0 ? images : [primaryImage],
         features: Array.isArray(room.amenities) && room.amenities.length > 0 ? room.amenities : ["WiFi", "Breakfast", "Hot shower", "Work desk"],
         description: room.description || ""
       } as Room;
@@ -174,18 +175,15 @@ export const getDbReviews = cache(async function getDbReviews() {
 const fallbackPartners = [
   {
     id: "fallback-1",
-    name: "Rwanda Tourism Board",
-    logo_url: "https://via.placeholder.com/220x80/10b981/ffffff?text=Rwanda+Tourism"
+    name: "Visit Rwanda",
+    logo_url: "",
+    status: "active"
   },
   {
     id: "fallback-2",
-    name: "Green Travel Co.",
-    logo_url: "https://via.placeholder.com/220x80/047857/ffffff?text=Green+Travel"
-  },
-  {
-    id: "fallback-3",
-    name: "EcoStay Partners",
-    logo_url: "https://via.placeholder.com/220x80/065f46/ffffff?text=EcoStay"
+    name: "Rwanda Development Board (RDB)",
+    logo_url: "",
+    status: "active"
   }
 ];
 

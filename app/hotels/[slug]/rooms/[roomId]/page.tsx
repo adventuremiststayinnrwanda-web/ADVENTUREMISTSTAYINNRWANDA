@@ -4,7 +4,8 @@ import { CalendarDays, QrCode, Users } from "lucide-react";
 import { BookingCheckout } from "@/components/BookingCheckout";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
-import { getDbHotel, getDbRoom } from "@/lib/server/db";
+import { RoomImageGallery } from "@/components/RoomImageGallery";
+import { getDbHotel } from "@/lib/server/db";
 
 export default async function RoomDetailsPage({
   params
@@ -19,14 +20,17 @@ export default async function RoomDetailsPage({
     notFound();
   }
 
+  const galleryImages = room.images && room.images.length > 0 ? room.images : [room.image];
+
   return (
     <>
       <Header />
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="grid gap-8 lg:grid-cols-[1fr_420px]">
           <section>
-            <div className="relative min-h-[460px] overflow-hidden rounded-lg">
-              <Image src={room.image} alt={room.name} fill priority sizes="(max-width: 1024px) 100vw, 828px" className="object-cover" />
+            {/* Full-page room gallery */}
+            <div className="room-detail-gallery">
+              <RoomImageGallery images={galleryImages} roomName={room.name} />
             </div>
             <div className="mt-8">
               <p className="font-semibold text-emerald-800">{hotel.name}</p>

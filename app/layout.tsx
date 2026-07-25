@@ -7,7 +7,11 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Adventure Mist Stay Inn Rwanda",
-  description: "Premium hotel booking in Musanze, Ruhengeri, Rwanda",
+  description: "Adventure Mist Stay Inn Rwanda is your trusted travel and hotel booking partner in Rwanda. Whether you're planning a vacation, business trip, honeymoon, or family getaway, we help you discover and book the perfect hotel with ease.",
+  openGraph: {
+    title: "Adventure Mist Stay Inn Rwanda | Hotel & Travel Booking Partner",
+    description: "Adventure Mist Stay Inn Rwanda is your trusted travel and hotel booking partner in Rwanda. Compare accommodations, secure the best rates, and enjoy a smooth booking experience.",
+  },
   icons: {
     icon: "/logo.jpg",
     shortcut: "/logo.jpg",

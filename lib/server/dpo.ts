@@ -52,7 +52,8 @@ export async function submitDpoOrder(order: DpoSubmitOrder): Promise<DpoOrderRes
   const companyToken = process.env.DPO_COMPANY_TOKEN;
   const serviceType = process.env.DPO_SERVICE_TYPE;
   const endpoint = process.env.DPO_ENDPOINT || "https://secure.3gdirectpay.com/API/v6/";
-  const basePaymentUrl = process.env.DPO_PAYMENT_URL || "https://secure.3gdirectpay.com/payv3.php?ID=";
+  let basePaymentUrl = process.env.DPO_PAYMENT_URL || "https://secure.3gdirectpay.com/payv3.php?ID=";
+  basePaymentUrl = basePaymentUrl.replace(/(ID=)(token|TransToken)?$/i, "$1");
 
   if (!companyToken || !serviceType) {
     throw new Error("DPO company token or service type is missing from environment variables.");

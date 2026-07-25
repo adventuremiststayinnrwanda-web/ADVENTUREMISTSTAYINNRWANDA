@@ -1,7 +1,12 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/server/adminAuth";
 import { supabaseRest, supabaseStorageUpload } from "@/lib/server/supabaseRest";
+
+export async function GET() {
+  return NextResponse.json({ ok: true });
+}
 
 export async function POST(request: NextRequest) {
   try {

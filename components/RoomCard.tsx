@@ -1,21 +1,27 @@
-import Image from "next/image";
 import Link from "next/link";
 import { Users } from "lucide-react";
 import { formatCurrency, Room } from "@/lib/data";
+import { RoomImageGallery } from "@/components/RoomImageGallery";
 
 export function RoomCard({ hotelSlug, room }: { hotelSlug: string; room: Room }) {
   const available = room.status === "Available";
+  const galleryImages = room.images && room.images.length > 0 ? room.images : [room.image];
 
   return (
-    <article className="group grid overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm transition hover:shadow-lg md:grid-cols-[260px_1fr]">
-      <div className="relative min-h-64 md:min-h-full overflow-hidden">
-        <Image src={room.image} alt={room.name} fill sizes="(max-width: 768px) 100vw, 260px" className="object-cover hover-zoom" />
+    <article className="group grid overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm transition hover:shadow-lg grid-cols-1 md:grid-cols-[300px_1fr]">
+      {/* Gallery Panel – 300 px wide on md+ */}
+      <div className="relative min-h-52 sm:min-h-64 md:min-h-full overflow-hidden flex flex-col">
+        <RoomImageGallery images={galleryImages} roomName={room.name} showThumbs={false} />
       </div>
-      <div className="p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+
+      {/* Content */}
+      <div className="p-4 sm:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-2 sm:gap-3">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-xl font-bold text-stone-950">{room.name}</h3>
+              <Link href={`/hotels/${hotelSlug}/rooms/${room.id}`} className="hover:text-emerald-700 transition">
+                <h3 className="text-lg sm:text-xl font-bold text-stone-950">{room.name}</h3>
+              </Link>
               {room.originalPrice && room.originalPrice > room.price && (
                 <span className="inline-flex items-center rounded bg-red-100 px-2 py-0.5 text-xs font-bold text-red-800">
                   Offer: {room.offerTitle || "Discounted"}

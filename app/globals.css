@@ -5,8 +5,23 @@
   --foreground: #0c0a09;
 }
 
+.sage-header {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
 * {
   box-sizing: border-box;
+}
+
+html,
+body {
+  overflow-x: hidden;
+  max-width: 100vw;
+  width: 100%;
 }
 
 html {
@@ -87,6 +102,202 @@ textarea {
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+/* ──────────────── Room Image Gallery ──────────────── */
+.room-gallery {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 260px;
+}
+
+.room-gallery__main {
+  position: relative;
+  flex: 1;
+  min-height: 220px;
+  overflow: hidden;
+  border-radius: 0;
+}
+
+/* rounded corners only on the outer card corner */
+.room-gallery__thumb:first-child {
+  border-radius: 4px 0 0 0;
+}
+
+.room-gallery__arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.2s ease, background 0.2s ease;
+}
+
+.room-gallery__main:hover .room-gallery__arrow,
+.room-gallery__main:focus-within .room-gallery__arrow {
+  opacity: 1;
+}
+
+.room-gallery__arrow:hover {
+  background: rgba(4, 120, 87, 0.88);
+}
+
+.room-gallery__arrow--left  { left: 8px; }
+.room-gallery__arrow--right { right: 8px; }
+
+.room-gallery__counter {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.room-gallery__thumbs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: #f5f5f4;
+}
+
+.room-gallery__thumb {
+  position: relative;
+  width: 60px;
+  height: 48px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 4px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: border-color 0.2s ease, opacity 0.2s ease;
+  opacity: 0.65;
+}
+
+.room-gallery__thumb:hover {
+  opacity: 1;
+}
+
+.room-gallery__thumb--active {
+  border-color: #047857;
+  opacity: 1;
+}
+
+/* Bigger gallery on the room detail page */
+.room-detail-gallery {
+  border-radius: 12px;
+  overflow: hidden;
+  min-height: 480px;
+  display: flex;
+  flex-direction: column;
+}
+
+.room-detail-gallery .room-gallery {
+  min-height: 480px;
+}
+
+.room-detail-gallery .room-gallery__main {
+  min-height: 400px;
+}
+
+.room-detail-gallery .room-gallery__arrow {
+  width: 40px;
+  height: 40px;
+  opacity: 0;
+}
+
+.room-detail-gallery .room-gallery__main:hover .room-gallery__arrow {
+  opacity: 1;
+}
+
+.room-detail-gallery .room-gallery__thumbs {
+  padding: 6px;
+  gap: 6px;
+}
+
+.room-detail-gallery .room-gallery__thumb {
+  width: 80px;
+  height: 60px;
+}
+
+/* ──────────────── Trusted Partners Marquee ──────────────── */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+.partners-track {
+  display: flex;
+  gap: 2.5rem;
+  animation: marquee 28s linear infinite;
+  width: max-content;
+}
+
+.partners-track:hover {
+  animation-play-state: paused;
+}
+
+.partner-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid #e7e5e4;
+  border-radius: 12px;
+  padding: 10px 20px;
+  min-width: 180px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  cursor: default;
+  white-space: nowrap;
+}
+
+.partner-badge:hover {
+  box-shadow: 0 6px 20px rgba(4,120,87,0.15);
+  transform: translateY(-2px);
+}
+
+.partner-badge__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.partner-badge__name {
+  font-weight: 700;
+  font-size: 13px;
+  color: #1c1917;
+  line-height: 1.2;
+}
+
+.partner-badge__type {
+  font-size: 11px;
+  color: #78716c;
+  font-weight: 500;
 }
 
 /* ──────────────── PDF / Print Styling ──────────────── */
